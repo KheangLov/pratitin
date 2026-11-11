@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ប្រតិទិន</string>
+    <string name="widget_name">Pratitin · Today</string>
+    <string name="widget_description">Today\'s Khmer lunar date and the next holiday</string>
+</resources>

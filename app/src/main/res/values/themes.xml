@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="night_ink">#0B0818</color>
+    <color name="temple_gold">#E8B653</color>
+
+    <style name="Theme.Pratitin" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/night_ink</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.Pratitin.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/night_ink</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_lotus_splash</item>
+        <item name="windowSplashScreenAnimationDuration">600</item>
+        <item name="postSplashScreenTheme">@style/Theme.Pratitin</item>
+    </style>
+</resources>
