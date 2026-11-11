@@ -1,6 +1,11 @@
 package com.pratitin.app.ui.screens.calendar
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateOffsetAsState
 import androidx.compose.animation.core.spring
@@ -68,7 +73,6 @@ import com.pratitin.app.ui.ShellState
 import com.pratitin.app.ui.Strings
 import com.pratitin.app.ui.components.Badge
 import com.pratitin.app.ui.components.GlassCard
-import com.pratitin.app.ui.components.GlassChip
 import com.pratitin.app.ui.components.GlassIconButton
 import com.pratitin.app.ui.components.Icons
 import com.pratitin.app.ui.components.SectionTitle
@@ -111,7 +115,7 @@ fun CalendarScreen(shell: ShellState) {
     val todayPage = (Day.year(today) - FIRST_YEAR) * 12 + Day.month(today) - 1
     val pager = rememberPagerState(initialPage = todayPage) { (LAST_YEAR - FIRST_YEAR + 1) * 12 }
     var selected by rememberSaveable { mutableIntStateOf(today) }
-    var moodLayer by rememberSaveable { mutableStateOf(true) }
+    var focus by rememberSaveable { mutableStateOf<Focus?>(null) }
 
     val page = pager.currentPage
     val year = FIRST_YEAR + page / 12
@@ -149,13 +153,23 @@ fun CalendarScreen(shell: ShellState) {
             }
         }
 
-        // ------------------------------------------------------------ layer chips
-        item(key = "layers") {
+        // ------------------------------------------------------------ highlight pills
+        // Each pill is both the legend (its marker matches the one drawn in the cells)
+        // and a filter: tap to spotlight those days in the grid, tap again to clear.
+        item(key = "pills") {
+            val monthCells = remember(year, month, settings, s, p, moods) { buildCells(year, month, settings, s, p, moods) }
+            fun count(f: Focus) = monthCells.count { it.inMonth && it.matches(f) }
             LazyRow(Modifier.enterStagger(1), horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-                item { GlassChip(s.global, settings.showGlobal, shell.bg, accent = p.holidayGlobal, leading = "🌍") { shell.vm.updateSettings { it.copy(showGlobal = !it.showGlobal) } } }
-                item { GlassChip(s.observance, settings.showObservances, shell.bg, accent = p.gold, leading = "🪷") { shell.vm.updateSettings { it.copy(showObservances = !it.showObservances) } } }
-                item { GlassChip(s.silaDay, settings.showSila, shell.bg, accent = p.goldSoft, leading = "☸") { shell.vm.updateSettings { it.copy(showSila = !it.showSila) } } }
-                item { GlassChip(s.tabMood, moodLayer, shell.bg, accent = p.lotus, leading = "🎨") { moodLayer = !moodLayer } }
+                Focus.entries.forEach { f ->
+                    if (f == Focus.GLOBAL && !settings.showGlobal) return@forEach
+                    if (f == Focus.SILA && !settings.showSila) return@forEach
+                    item(key = f.name) {
+                        HighlightPill(
+                            label = f.label(s), count = s.num(count(f)), color = f.color(p), marker = f,
+                            selected = focus == f, onClick = { focus = if (focus == f) null else f },
+                        )
+                    }
+                }
             }
         }
 
@@ -169,7 +183,7 @@ fun CalendarScreen(shell: ShellState) {
                     val m = pg % 12 + 1
                     MonthGrid(
                         year = y, month = m, today = today, selected = { selected },
-                        settings = settings, moods = if (moodLayer) moods else emptyMap(),
+                        settings = settings, moods = moods, focus = focus,
                         onTap = { d, rect ->
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (d == selected) shell.openDay(d, rect) else selected = d
@@ -181,9 +195,13 @@ fun CalendarScreen(shell: ShellState) {
             }
         }
 
-        // ------------------------------------------------------------ selected day
+        // ------------------------------------------------------------ spotlight list / selected day
+        val f = focus
+        if (f != null) item(key = "matches-${f.name}") {
+            FocusStrip(shell, f, year, month, settings, moods, Modifier.enterStagger(3))
+        }
         item(key = "selected") {
-            SelectedDayCard(shell, selected, settings, moods[selected], Modifier.enterStagger(3))
+            SelectedDayCard(shell, selected, settings, moods[selected], Modifier.enterStagger(4))
         }
 
         // ------------------------------------------------------------ month events
@@ -235,12 +253,25 @@ private fun WeekdayHeader(monday: Boolean, s: Strings) {
     }
 }
 
+/** What the highlight pills can spotlight. */
+enum class Focus {
+    KHMER, SILA, GLOBAL, MOOD;
+
+    fun label(s: Strings) = when (this) { KHMER -> s.publicHoliday; SILA -> s.silaDay; GLOBAL -> s.global; MOOD -> s.tabMood }
+    fun color(p: HeritagePalette) = when (this) { KHMER -> p.holidayKhmer; SILA -> p.gold; GLOBAL -> p.holidayGlobal; MOOD -> p.lotus }
+}
+
 /** Pre-computed, immutable model of one month page — built once per (month, inputs). */
 private class Cell(
     val date: Int, val inMonth: Boolean, val dom: String, val lunar: String,
-    val publicHoliday: Boolean, val dot: Color?, val sila: Boolean, val moon: Int, // 0 none, 1 full, 2 new
+    val publicHoliday: Boolean, val observance: Boolean, val global: Boolean,
+    val sila: Boolean, val moon: Int, // 0 none, 1 full, 2 new
     val mood: Color?, val weekend: Boolean,
-)
+) {
+    fun matches(f: Focus) = when (f) {
+        Focus.KHMER -> publicHoliday; Focus.SILA -> sila; Focus.GLOBAL -> global; Focus.MOOD -> mood != null
+    }
+}
 
 private fun buildCells(year: Int, month: Int, s: Settings, strings: Strings, p: HeritagePalette, moods: Map<Int, MoodEntry>): List<Cell> {
     val first = year * 10000 + month * 100 + 1
@@ -258,7 +289,8 @@ private fun buildCells(year: Int, month: Int, s: Settings, strings: Strings, p: 
             dom = strings.num(Day.dom(d)),
             lunar = if (strings.lang == Lang.KM) k.shortLabel() else "${k.day}${if (k.dayNumber < 15) "K" else "R"}",
             publicHoliday = hol.any { it.kind == HolidayKind.KHMER_PUBLIC },
-            dot = hol.firstOrNull()?.let { holidayColor(it, p) },
+            observance = hol.any { it.kind == HolidayKind.KHMER_OBSERVANCE },
+            global = hol.any { it.kind == HolidayKind.GLOBAL },
             sila = s.showSila && k.isSilaDay(dim),
             moon = when { k.isFullMoon -> 1; k.dayNumber == dim - 1 -> 2; else -> 0 },
             mood = moods[d]?.mood?.color,
@@ -267,15 +299,93 @@ private fun buildCells(year: Int, month: Int, s: Settings, strings: Strings, p: 
     }
 }
 
+/** Small dharma-wheel (ធម្មចក្រ) mark for Sila days — 8 spokes in a ring. */
+private fun DrawScope.drawSilaWheel(c: Offset, r: Float, color: Color) {
+    drawCircle(color, r, c, style = Stroke(r * 0.28f))
+    for (k in 0 until 8) {
+        val a = Math.toRadians(k * 45.0)
+        val dx = kotlin.math.cos(a).toFloat(); val dy = kotlin.math.sin(a).toFloat()
+        drawLine(color, Offset(c.x + dx * r * 0.25f, c.y + dy * r * 0.25f), Offset(c.x + dx * r, c.y + dy * r), r * 0.2f)
+    }
+    drawCircle(color, r * 0.25f, c)
+}
+
+/** Draws the marker a pill and a cell share, so the legend reads at a glance. */
+private fun DrawScope.drawFocusMarker(f: Focus, c: Offset, color: Color) {
+    val u = 1.dp.toPx()
+    when (f) {
+        Focus.SILA -> drawSilaWheel(c, 5f * u, color)
+        Focus.KHMER, Focus.GLOBAL -> drawRoundRect(color, Offset(c.x - 5f * u, c.y - 1.5f * u), Size(10f * u, 3f * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u))
+        Focus.MOOD -> drawRoundRect(color, Offset(c.x - 5f * u, c.y - 1.5f * u), Size(10f * u, 3f * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u))
+    }
+}
+
+@Composable
+private fun HighlightPill(label: String, count: String, color: Color, marker: Focus, selected: Boolean, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    val bg by animateColorAsState(if (selected) color.copy(alpha = 0.9f) else p.inkFaint.copy(alpha = 0.10f), label = "pill")
+    val fg = if (selected) (if (p.isDark) p.night else Color.White) else p.ink
+    Row(
+        Modifier.height(34.dp).clip(Squircles.pill).background(bg)
+            .border(1.dp, color.copy(alpha = if (selected) 0f else 0.45f), Squircles.pill)
+            .clickable(onClick = onClick).padding(start = 10.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.size(14.dp)) { drawFocusMarker(marker, center, if (selected) fg else color) }
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = HeritageType.label, color = fg, maxLines = 1)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            count, style = HeritageType.micro, color = if (selected) color else fg, maxLines = 1,
+            modifier = Modifier.clip(Squircles.pill).background(if (selected) fg else color.copy(alpha = 0.18f)).padding(horizontal = 7.dp, vertical = 2.dp),
+        )
+    }
+}
+
+/** When a pill is active: every matching day of the month as tappable tiles. */
+@Composable
+private fun FocusStrip(shell: ShellState, f: Focus, year: Int, month: Int, settings: Settings, moods: Map<Int, MoodEntry>, modifier: Modifier) {
+    val p = LocalPalette.current
+    val s = LocalStrings.current
+    val cells = remember(year, month, settings, s, p, moods) { buildCells(year, month, settings, s, p, moods).filter { it.inMonth && it.matches(f) } }
+    val color = f.color(p)
+    GlassCard(shell.bg, modifier.fillMaxWidth(), padding = PaddingValues(12.dp)) {
+        if (cells.isEmpty()) {
+            Text("—", style = HeritageType.label, color = p.inkSoft)
+        } else LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(cells.size) { i ->
+                val c = cells[i]
+                val hol = remember(c.date, settings) { holidaysOn(c.date, settings) }
+                val sub = when (f) {
+                    Focus.SILA -> c.lunar
+                    Focus.MOOD -> moods[c.date]?.mood?.emoji ?: ""
+                    Focus.KHMER -> hol.firstOrNull { it.kind == HolidayKind.KHMER_PUBLIC }?.emoji ?: ""
+                    Focus.GLOBAL -> hol.firstOrNull { it.kind == HolidayKind.GLOBAL }?.emoji ?: ""
+                }
+                Column(
+                    Modifier.width(54.dp).clip(Squircles.s).background(color.copy(alpha = 0.16f))
+                        .border(1.dp, color.copy(alpha = 0.5f), Squircles.s)
+                        .clickable { shell.openDay(c.date, null) }.padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(c.dom, style = HeritageType.heading, color = p.ink, maxLines = 1)
+                    Text(s.weekdaysShort[Day.weekday(c.date)], style = HeritageType.micro, color = p.inkSoft, maxLines = 1)
+                    Text(sub, style = HeritageType.micro, color = color, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun MonthGrid(
     year: Int, month: Int, today: Int, selected: () -> Int,
-    settings: Settings, moods: Map<Int, MoodEntry>,
+    settings: Settings, moods: Map<Int, MoodEntry>, focus: Focus?,
     onTap: (Int, Rect?) -> Unit,
 ) {
     val p = LocalPalette.current
     val s = LocalStrings.current
-    val measurer = rememberTextMeasurer(cacheSize = 128)
+    val measurer = rememberTextMeasurer(cacheSize = 192)
     val cells = remember(year, month, settings, s, p, moods) { buildCells(year, month, settings, s, p, moods) }
     var gridOrigin by remember { mutableStateOf(Offset.Zero) }
 
@@ -284,6 +394,12 @@ private fun MonthGrid(
     val target = if (selIndex >= 0) Offset((selIndex % 7).toFloat(), (selIndex / 7).toFloat()) else Offset(-10f, -10f)
     val selPos by animateOffsetAsState(target, spring(dampingRatio = 0.7f, stiffness = 420f), label = "sel")
     val selAlpha by animateFloatAsState(if (selIndex >= 0) 1f else 0f, label = "selA")
+    // Spotlight cross-fade: 0 = normal, 1 = only matching days are lit.
+    val spot by animateFloatAsState(if (focus != null) 1f else 0f, label = "spot")
+    // keep the last focus while the spotlight fades out (plain holder: no state write in composition)
+    val lastFocus = remember { arrayOfNulls<Focus>(1) }
+    if (focus != null) lastFocus[0] = focus
+    val activeFocus = lastFocus[0]
 
     Box(
         Modifier.fillMaxWidth().aspectRatio(7f / 6f / 1.08f)
@@ -307,6 +423,7 @@ private fun MonthGrid(
                 val cellPath = squirclePath(cellSize, 14.dp.toPx(), 0.6f, Path())
                 val domStyle = HeritageType.heading.copy(fontSize = 17.sp)
                 val lunarStyle = HeritageType.micro.copy(fontSize = 9.sp)
+                val u = 1.dp.toPx()
                 val layouts = cells.map { cell ->
                     val isToday = cell.date == today
                     val domColor = when {
@@ -315,10 +432,15 @@ private fun MonthGrid(
                         cell.weekend -> p.lotus.copy(alpha = 0.9f)
                         else -> p.ink
                     }.let { if (cell.inMonth || isToday) it else it.copy(alpha = 0.32f) }
-                    val lunarColor = (if (isToday) p.night.copy(alpha = 0.75f) else p.gold).let { if (cell.inMonth) it else it.copy(alpha = 0.3f) }
+                    val lunarColor = when {
+                        isToday -> p.night.copy(alpha = 0.75f)
+                        cell.sila -> p.goldSoft
+                        else -> p.gold.copy(alpha = 0.8f)
+                    }.let { if (cell.inMonth) it else it.copy(alpha = 0.3f) }
                     measurer.measure(cell.dom, domStyle.copy(color = domColor)) to measurer.measure(cell.lunar, lunarStyle.copy(color = lunarColor))
                 }
                 onDrawBehind {
+                    val f = activeFocus
                     // selection glow (under cells)
                     if (selAlpha > 0.01f) {
                         translate(selPos.x * cw + inset, selPos.y * ch + inset) {
@@ -330,36 +452,60 @@ private fun MonthGrid(
                         val x = (i % 7) * cw
                         val y = (i / 7) * ch
                         val isToday = cell.date == today
+                        val match = f != null && cell.inMonth && cell.matches(f)
+                        // non-matching days fade back while a pill is active
+                        val dim = if (f != null && !match && !isToday) 1f - 0.75f * spot else 1f
                         translate(x + inset, y + inset) {
                             when {
                                 isToday -> drawPath(cellPath, p.gold)
-                                cell.publicHoliday && cell.inMonth -> drawPath(cellPath, p.holidayKhmer.copy(alpha = 0.13f))
+                                cell.publicHoliday && cell.inMonth -> drawPath(cellPath, p.holidayKhmer.copy(alpha = 0.13f * dim))
                             }
+                            if (match && f != null) {
+                                val fc = if (f == Focus.MOOD) cell.mood ?: f.color(p) else f.color(p)
+                                drawPath(cellPath, fc.copy(alpha = 0.24f * spot))
+                                drawPath(cellPath, fc.copy(alpha = 0.95f * spot), style = Stroke(1.6.dp.toPx()))
+                            }
+                            // mood: bottom bar
                             cell.mood?.let { mc ->
                                 val bw = cellSize.width * 0.42f
-                                drawRoundRect(mc.copy(alpha = if (cell.inMonth) 0.95f else 0.35f), Offset((cellSize.width - bw) / 2, cellSize.height - 5.dp.toPx()), Size(bw, 3.dp.toPx()), androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()))
+                                drawRoundRect(mc.copy(alpha = (if (cell.inMonth) 0.95f else 0.35f) * dim), Offset((cellSize.width - bw) / 2, cellSize.height - 5 * u), Size(bw, 3 * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u))
+                            }
+                            // holiday categories: short bars across the top (red · gold · blue)
+                            val bars = buildList {
+                                if (cell.publicHoliday) add(p.holidayKhmer)
+                                if (cell.observance) add(p.gold)
+                                if (cell.global) add(p.holidayGlobal)
+                            }
+                            if (bars.isNotEmpty()) {
+                                val bw = 9 * u; val gap = 2 * u
+                                var bx = (cellSize.width - (bars.size * bw + (bars.size - 1) * gap)) / 2
+                                bars.forEach { c ->
+                                    val col = if (isToday) p.night else c
+                                    drawRoundRect(col.copy(alpha = (if (cell.inMonth) 1f else 0.35f) * dim), Offset(bx, 3 * u), Size(bw, 3 * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u))
+                                    bx += bw + gap
+                                }
                             }
                         }
                         val (domL, lunL) = layouts[i]
-                        drawCentered(domL, x + cw / 2, y + ch * 0.40f)
-                        drawCentered(lunL, x + cw / 2, y + ch * 0.72f)
-                        // moon & markers in the top-right corner
-                        val mx = x + cw - inset - 8.dp.toPx()
-                        val my = y + inset + 8.dp.toPx()
-                        when (cell.moon) {
-                            1 -> drawMoon(Offset(mx, my), 3.5.dp.toPx(), 1f, true, if (isToday) p.night else p.moon, Color.Transparent, glow = false)
-                            2 -> drawCircle(if (isToday) p.night else p.inkSoft, 3.5.dp.toPx(), Offset(mx, my), style = Stroke(1.dp.toPx()))
+                        drawCentered(domL, x + cw / 2, y + ch * 0.42f, dim)
+                        drawCentered(lunL, x + cw / 2, y + ch * 0.72f, dim)
+                        // moon / Sila mark — top-right corner
+                        val mx = x + cw - inset - 8 * u
+                        val my = y + inset + 8 * u
+                        val markColor = if (isToday) p.night else p.goldSoft
+                        when {
+                            cell.moon == 1 -> drawMoon(Offset(mx, my), 3.6f * u, 1f, true, (if (isToday) p.night else p.moon).copy(alpha = dim), Color.Transparent, glow = false)
+                            cell.moon == 2 -> drawCircle((if (isToday) p.night else p.inkSoft).copy(alpha = dim), 3.6f * u, Offset(mx, my), style = Stroke(1.2f * u))
+                            cell.sila -> drawSilaWheel(Offset(mx, my), 3.8f * u, markColor.copy(alpha = (if (cell.inMonth) 1f else 0.35f) * dim))
                         }
-                        if (cell.sila && cell.moon == 0) drawCircle(if (isToday) p.night else p.goldSoft, 1.8.dp.toPx(), Offset(mx, my))
-                        cell.dot?.let { if (!cell.publicHoliday || !cell.inMonth) drawCircle(it.copy(alpha = if (cell.inMonth) 1f else 0.4f), 2.2.dp.toPx(), Offset(x + inset + 8.dp.toPx(), my)) }
                     }
                 }
             },
     )
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCentered(layout: TextLayoutResult, cx: Float, cy: Float) {
-    drawText(layout, topLeft = Offset(cx - layout.size.width / 2f, cy - layout.size.height / 2f))
+private fun DrawScope.drawCentered(layout: TextLayoutResult, cx: Float, cy: Float, alpha: Float = 1f) {
+    drawText(layout, topLeft = Offset(cx - layout.size.width / 2f, cy - layout.size.height / 2f), alpha = alpha)
 }
 
 @Composable

@@ -114,7 +114,7 @@ fun HolidaysScreen(shell: ShellState) {
             item(key = "breaks") {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
                     itemsIndexed(breaks, key = { _, b -> b.startPacked }) { i, b ->
-                        BreakCard(shell, b, today, Modifier.width(240.dp).enterStagger(2 + i))
+                        BreakCard(shell, b, today, Modifier.width(236.dp).height(178.dp).enterStagger(2 + i))
                     }
                 }
             }
@@ -199,10 +199,12 @@ private fun BreakCard(shell: ShellState, b: BreakSuggestion, today: Int, modifie
     val publicDates = remember(publicHolidays) { publicHolidays.map { it.packed }.toSet() }
     val names = remember(publicHolidays, s) { publicHolidays.distinctBy { it.id }.joinToString(" · ") { it.title(s).substringBefore(" · ") } }
     GlassCard(shell.bg, modifier, liquid = true, onClick = { shell.openDay(b.startPacked, null) }) {
-        Text(s.takeLeave(b.leaveDays.size, b.totalDaysOff), style = HeritageType.heading, color = p.goldSoft, maxLines = 1)
-        Text("${gregorianShort(b.startPacked, s)} – ${gregorianShort(b.endPacked, s)}", style = HeritageType.label, color = p.inkSoft)
+        // Fixed-height card: headline, dates and timeline sit at the top, holiday names
+        // are pinned to the bottom (max 2 lines), so every card in the row lines up.
+        Text(s.takeLeave(b.leaveDays.size, b.totalDaysOff), style = HeritageType.heading, color = p.goldSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("${gregorianShort(b.startPacked, s)} – ${gregorianShort(b.endPacked, s)}", style = HeritageType.label, color = p.inkSoft, maxLines = 1)
         Spacer(Modifier.height(10.dp))
-        Canvas(Modifier.fillMaxWidth().height(22.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(20.dp)) {
             val n = b.totalDaysOff
             val gap = 3.dp.toPx()
             val w = (size.width - gap * (n - 1)) / n
@@ -216,9 +218,12 @@ private fun BreakCard(shell: ShellState, b: BreakSuggestion, today: Int, modifie
                 drawRoundRect(c, Offset(i * (w + gap), 0f), Size(w, size.height), CornerRadius(5.dp.toPx()))
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(names, style = HeritageType.micro, color = p.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (b.endPacked < today) Text("✓", style = HeritageType.micro, color = p.inkFaint)
+        Spacer(Modifier.weight(1f))
+        Text(
+            if (b.endPacked < today) "✓ $names" else names,
+            style = HeritageType.micro, color = p.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            minLines = 2,
+        )
     }
 }
 

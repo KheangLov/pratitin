@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +43,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -82,7 +84,11 @@ fun LifeScreen(shell: ShellState) {
 
     if (picking) {
         val initial = if (settings.birthDate != 0) Day.unpack(settings.birthDate) else java.time.LocalDate.of(1998, 1, 1)
-        val state = rememberDatePickerState(initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            yearRange = 1920..java.time.LocalDate.now().year,
+            initialDisplayMode = DisplayMode.Picker,
+        )
         DatePickerDialog(
             onDismissRequest = { picking = false },
             confirmButton = {
@@ -95,7 +101,14 @@ fun LifeScreen(shell: ShellState) {
                 }) { Text(s.save, color = p.gold) }
             },
             colors = DatePickerDefaults.colors(containerColor = p.nightDeep),
-        ) { DatePicker(state, colors = DatePickerDefaults.colors(containerColor = p.nightDeep, selectedDayContainerColor = p.gold, todayDateBorderColor = p.gold)) }
+        ) {
+            // The text-input mode (pen button) crashes with some device locales, so only the
+            // calendar picker is offered; year selection is still one tap on the header.
+            DatePicker(
+                state, showModeToggle = false,
+                colors = DatePickerDefaults.colors(containerColor = p.nightDeep, selectedDayContainerColor = p.gold, todayDateBorderColor = p.gold),
+            )
+        }
     }
 
     ScreenList(shell) {
@@ -177,7 +190,7 @@ private fun WeeksGrid(birth: Int, years: Int, lived: Int, moods: Map<Int, MoodEn
     val measurer = rememberTextMeasurer(cacheSize = 16)
     val reduce = LocalReduceMotion.current
     val reveal = remember { Animatable(if (reduce) 1f else 0f) }
-    LaunchedEffect(lived) { reveal.animateTo(1f, tween(1400, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+    LaunchedEffect(Unit) { reveal.animateTo(1f, tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
     val inf = rememberInfiniteTransition(label = "now")
     val pulse by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "pulse")
 
@@ -198,6 +211,12 @@ private fun WeeksGrid(birth: Int, years: Int, lived: Int, moods: Map<Int, MoodEn
         val cell = (maxWidth - labelW) / 52
         Canvas(
             Modifier.fillMaxWidth().height(cell * years)
+                // Cached RenderNode: the ~4 000 cells are recorded once and replayed on scroll.
+                // The entrance is a cheap layer fade/rise instead of redrawing every cell per frame.
+                .graphicsLayer {
+                    alpha = reveal.value
+                    translationY = (1f - reveal.value) * 24.dp.toPx()
+                }
                 .onGloballyPositioned { origin = it.positionInRoot() }
                 .pointerInput(birth, years) {
                     detectTapGestures { pos ->
@@ -216,7 +235,7 @@ private fun WeeksGrid(birth: Int, years: Int, lived: Int, moods: Map<Int, MoodEn
             val c = (size.width - lw) / 52f
             val gap = (c * 0.18f).coerceAtLeast(1f)
             val r = CornerRadius(c * 0.28f)
-            val shown = (lived * reveal.value).toInt()
+            val shown = lived
             for (row in 0 until years) {
                 if (row % 10 == 0) {
                     val l = measurer.measure(s.num(row), HeritageType.micro.copy(color = p.inkSoft, fontSize = 8.sp))
@@ -242,7 +261,7 @@ private fun WeeksGrid(birth: Int, years: Int, lived: Int, moods: Map<Int, MoodEn
         // The "you are here" ripple lives in its own tiny layer so the 4 000-cell grid
         // above is never redrawn by the infinite animation.
         if (lived < years * 52) {
-            Canvas(Modifier.fillMaxWidth().height(cell * years)) {
+            Canvas(Modifier.fillMaxWidth().height(cell * years).graphicsLayer()) {
                 val lw = labelW.toPx()
                 val c = (size.width - lw) / 52f
                 val cx = lw + (lived % 52) * c + c / 2

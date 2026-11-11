@@ -152,7 +152,8 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         Box(Modifier.fillMaxSize().backdropSource(content)) {
             // Layer 1 — the sky that cards look through
             Box(Modifier.fillMaxSize().backdropSource(bg)) {
-                HeritageSky(animate = animateSky, parallax = { scroll.floatValue })
+                // Own RenderNode: the 30 fps sky re-records only itself, never the screens on top.
+                HeritageSky(animate = animateSky, parallax = { scroll.floatValue }, modifier = Modifier.graphicsLayer())
             }
             CompositionLocalProvider(LocalEnclosingBackdrop provides content) {
             AnimatedContent(
@@ -165,7 +166,8 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
                             scaleOut(spring(stiffness = 500f), targetScale = 0.98f))
                 },
                 label = "tabs",
-                modifier = Modifier.fillMaxSize(),
+                // Own RenderNode: screen content is not re-drawn when the sky animates.
+                modifier = Modifier.fillMaxSize().graphicsLayer(),
             ) { t ->
                 holder.SaveableStateProvider(t.name) {
                     when (t) {
