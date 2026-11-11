@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -97,6 +98,7 @@ val LocalPalette = staticCompositionLocalOf { DuskPalette }
 // ---------------------------------------------------------------- type
 private val Moul = FontFamily(Font(R.font.moul_regular))
 
+@OptIn(ExperimentalTextApi::class)
 private fun kantumruy(weight: Int) = Font(
     R.font.kantumruy_pro,
     weight = FontWeight(weight),
