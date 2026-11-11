@@ -153,7 +153,7 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
             // Layer 1 — the sky that cards look through
             Box(Modifier.fillMaxSize().backdropSource(bg)) {
                 // Own RenderNode: the 30 fps sky re-records only itself, never the screens on top.
-                HeritageSky(animate = animateSky, parallax = { scroll.floatValue }, modifier = Modifier.graphicsLayer())
+                HeritageSky(animate = animateSky && tab == Tab.TODAY, parallax = { scroll.floatValue }, modifier = Modifier.graphicsLayer())
             }
             CompositionLocalProvider(LocalEnclosingBackdrop provides content) {
             AnimatedContent(

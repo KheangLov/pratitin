@@ -1,6 +1,14 @@
 package com.pratitin.app.ui.screens.life
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -183,40 +191,78 @@ private fun decadeColor(p: HeritagePalette, year: Int): Color {
     return lerp(stops[i], stops[i + 1], t - i)
 }
 
+/**
+ * Rasterises the whole life grid (~4 000 rounded cells) into ONE bitmap on a background
+ * thread. On screen it is then a single drawImage — the GPU no longer replays thousands
+ * of shapes every frame (glass blur renders the content 2–3× per frame, which made the
+ * vector version janky on mid-range phones).
+ */
+private fun renderWeeks(
+    widthPx: Int, cellPx: Float, labelPx: Float, years: Int, lived: Int,
+    weekMood: Map<Int, Color>, p: HeritagePalette, density: androidx.compose.ui.unit.Density,
+): ImageBitmap {
+    val h = (cellPx * years).toInt().coerceAtLeast(1)
+    val bmp = ImageBitmap(widthPx.coerceAtLeast(1), h)
+    CanvasDrawScope().draw(density, LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(bmp), Size(widthPx.toFloat(), h.toFloat())) {
+        val c = cellPx
+        val gap = (c * 0.18f).coerceAtLeast(1f)
+        val r = CornerRadius(c * 0.28f)
+        val sz = Size(c - gap, c - gap)
+        val future = p.inkFaint.copy(alpha = 0.12f)
+        for (row in 0 until years) {
+            val base = decadeColor(p, row).copy(alpha = 0.85f)
+            for (col in 0 until 52) {
+                val w = row * 52 + col
+                val tl = Offset(labelPx + col * c + gap / 2, row * c + gap / 2)
+                val color = when {
+                    w < lived -> weekMood[w] ?: base
+                    w == lived -> p.goldSoft
+                    else -> future
+                }
+                drawRoundRect(color, tl, sz, r)
+            }
+        }
+        val sep = Brush.horizontalGradient(listOf(Color.Transparent, p.gold.copy(alpha = 0.4f), Color.Transparent))
+        for (row in 10 until years step 10) drawLine(sep, Offset(labelPx, row * c - 0.5f), Offset(size.width, row * c - 0.5f), 1f)
+    }
+    bmp.prepareToDraw()
+    return bmp
+}
+
 @Composable
 private fun WeeksGrid(birth: Int, years: Int, lived: Int, moods: Map<Int, MoodEntry>, onTap: (Int, Rect?) -> Unit) {
     val p = LocalPalette.current
     val s = LocalStrings.current
+    val density = LocalDensity.current
     val measurer = rememberTextMeasurer(cacheSize = 16)
-    val reduce = LocalReduceMotion.current
-    val reveal = remember { Animatable(if (reduce) 1f else 0f) }
-    LaunchedEffect(Unit) { reveal.animateTo(1f, tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
-    val inf = rememberInfiniteTransition(label = "now")
-    val pulse by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "pulse")
-
-    // Average mood colour per life-week (only weeks that have entries).
-    val weekMood: Map<Int, Color> = remember(moods, birth) {
-        moods.values.groupBy { (Day.between(birth, it.date) / 7).toInt() }
-            .mapValues { (_, list) ->
-                val r = list.map { it.mood.color.red }.average().toFloat()
-                val g = list.map { it.mood.color.green }.average().toFloat()
-                val b = list.map { it.mood.color.blue }.average().toFloat()
-                Color(r, g, b)
-            }
-    }
     var origin by remember { mutableStateOf(Offset.Zero) }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val labelW = 22.dp
         val cell = (maxWidth - labelW) / 52
+        val widthPx = constraints.maxWidth
+        val labelPx = with(density) { labelW.toPx() }
+        val cellPx = (widthPx - labelPx) / 52f
+
+        // Built off the main thread; recomputed only when inputs change.
+        val bitmap by produceState<ImageBitmap?>(null, widthPx, years, lived, birth, moods, p) {
+            value = withContext(Dispatchers.Default) {
+                val weekMood = moods.values.groupBy { (Day.between(birth, it.date) / 7).toInt() }
+                    .mapValues { (_, list) ->
+                        Color(
+                            list.map { it.mood.color.red }.average().toFloat(),
+                            list.map { it.mood.color.green }.average().toFloat(),
+                            list.map { it.mood.color.blue }.average().toFloat(),
+                        )
+                    }
+                renderWeeks(widthPx, cellPx, labelPx, years, lived, weekMood, p, density)
+            }
+        }
+        val shown by animateFloatAsState(if (bitmap != null) 1f else 0f, tween(450), label = "grid")
+
         Canvas(
             Modifier.fillMaxWidth().height(cell * years)
-                // Cached RenderNode: the ~4 000 cells are recorded once and replayed on scroll.
-                // The entrance is a cheap layer fade/rise instead of redrawing every cell per frame.
-                .graphicsLayer {
-                    alpha = reveal.value
-                    translationY = (1f - reveal.value) * 24.dp.toPx()
-                }
+                .graphicsLayer { alpha = shown; translationY = (1f - shown) * 16.dp.toPx() }
                 .onGloballyPositioned { origin = it.positionInRoot() }
                 .pointerInput(birth, years) {
                     detectTapGestures { pos ->
@@ -231,43 +277,29 @@ private fun WeeksGrid(birth: Int, years: Int, lived: Int, moods: Map<Int, MoodEn
                     }
                 },
         ) {
-            val lw = labelW.toPx()
-            val c = (size.width - lw) / 52f
-            val gap = (c * 0.18f).coerceAtLeast(1f)
-            val r = CornerRadius(c * 0.28f)
-            val shown = lived
-            for (row in 0 until years) {
-                if (row % 10 == 0) {
-                    val l = measurer.measure(s.num(row), HeritageType.micro.copy(color = p.inkSoft, fontSize = 8.sp))
-                    drawText(l, topLeft = Offset(0f, row * c + (c - l.size.height) / 2))
-                }
-                val base = decadeColor(p, row)
-                for (col in 0 until 52) {
-                    val w = row * 52 + col
-                    val tl = Offset(lw + col * c + gap / 2, row * c + gap / 2)
-                    val sz = Size(c - gap, c - gap)
-                    when {
-                        w < shown -> drawRoundRect(weekMood[w] ?: base.copy(alpha = 0.85f), tl, sz, r)
-                        w == lived -> drawRoundRect(p.goldSoft, tl, sz, r)
-                        else -> drawRoundRect(p.inkFaint.copy(alpha = 0.12f), tl, sz, r)
-                    }
-                }
-            }
-            // decade separators
-            for (row in 10 until years step 10) {
-                drawLine(Brush.horizontalGradient(listOf(Color.Transparent, p.gold.copy(alpha = 0.4f), Color.Transparent)), Offset(lw, row * c - 0.5f), Offset(size.width, row * c - 0.5f), 1f)
+            bitmap?.let { drawImage(it) }
+            val c = (size.width - labelW.toPx()) / 52f
+            for (row in 0 until years step 10) {
+                val l = measurer.measure(s.num(row), HeritageType.micro.copy(color = p.inkSoft, fontSize = 8.sp))
+                drawText(l, topLeft = Offset(0f, row * c + (c - l.size.height) / 2))
             }
         }
-        // The "you are here" ripple lives in its own tiny layer so the 4 000-cell grid
-        // above is never redrawn by the infinite animation.
+
+        // "You are here": three ripples when the page opens, then it rests — no endless
+        // animation keeping the GPU busy while you read.
         if (lived < years * 52) {
+            val ripple = remember { Animatable(0f) }
+            LaunchedEffect(bitmap != null) {
+                if (bitmap == null) return@LaunchedEffect
+                repeat(3) { ripple.snapTo(0f); ripple.animateTo(1f, tween(1400, easing = LinearEasing)) }
+            }
             Canvas(Modifier.fillMaxWidth().height(cell * years).graphicsLayer()) {
                 val lw = labelW.toPx()
                 val c = (size.width - lw) / 52f
-                val cx = lw + (lived % 52) * c + c / 2
-                val cy = (lived / 52) * c + c / 2
-                val ph = pulse
-                drawCircle(p.goldSoft.copy(alpha = 0.6f * (1f - ph)), c * (0.6f + 1.8f * ph), Offset(cx, cy), style = Stroke(1.2.dp.toPx()))
+                val center = Offset(lw + (lived % 52) * c + c / 2, (lived / 52) * c + c / 2)
+                val ph = ripple.value
+                if (ph in 0.001f..0.999f) drawCircle(p.goldSoft.copy(alpha = 0.6f * (1f - ph)), c * (0.6f + 1.8f * ph), center, style = Stroke(1.2.dp.toPx()))
+                drawCircle(p.goldSoft, c * 0.75f, center, style = Stroke(1.dp.toPx()))
             }
         }
     }
