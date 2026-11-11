@@ -279,11 +279,11 @@ private fun HeroBadges(k: com.pratitin.khmer.KhmerDate, holidays: List<Pair<Stri
     val dim = KhmerCalendar.daysInMonth(k.monthIndex, k.beYear)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         holidays.forEach { (name, c) -> Badge(name, c, filled = true) }
-        if (k.isSilaDay(dim)) Badge("☸ ${s.silaDay}", p.gold)
-        if (k.isFullMoon) Badge("🌕 ${s.fullMoon}", p.moon)
-        if (k.dayNumber == dim - 1) Badge("🌑 ${s.newMoon}", p.inkSoft)
+        if (k.isSilaDay(dim)) Badge(s.silaDay, p.gold, icon = Icons.wheel)
+        if (k.isFullMoon) Badge(s.fullMoon, p.moon, icon = Icons.fullMoon)
+        if (k.dayNumber == dim - 1) Badge(s.newMoon, p.inkSoft, icon = Icons.newMoon)
         when (KhmerCalendar.leapKind(k.beYear)) {
-            1 -> Badge(s.leapMonth, p.lotus)
+            1 -> Badge(s.leapMonth, p.lotus, icon = Icons.leap)
             2 -> Badge(s.leapDay, p.jade)
         }
     }

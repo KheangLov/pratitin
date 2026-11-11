@@ -183,7 +183,7 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
             // Layer 1 — the sky that cards look through
             Box(Modifier.fillMaxSize().backdropSource(bg)) {
                 // Own RenderNode: the 30 fps sky re-records only itself, never the screens on top.
-                HeritageSky(animate = animateSky && tab == Tab.TODAY, parallax = { scroll.floatValue }, modifier = Modifier.graphicsLayer())
+                HeritageSky(animate = animateSky && tab == Tab.TODAY && !detailOpen && !settingsOpen && editing == null, parallax = { scroll.floatValue }, modifier = Modifier.graphicsLayer())
             }
             CompositionLocalProvider(LocalEnclosingBackdrop provides content) {
             AnimatedContent(
@@ -222,7 +222,7 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         val scrimAlpha by animateFloatAsState(if (detailOpen || settingsOpen) 1f else 0f, Motion.gentle, label = "scrim")
         if (scrimAlpha > 0.01f) {
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f * scrimAlpha))
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = (if (detailOpen) 0.62f else 0.45f) * scrimAlpha))
                     .clickable(remember { MutableInteractionSource() }, null) { detailOpen = false; settingsOpen = false },
             )
         }

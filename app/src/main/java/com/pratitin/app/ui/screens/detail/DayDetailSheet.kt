@@ -20,6 +20,7 @@ import com.pratitin.app.data.UserEvent
 import com.pratitin.app.ui.heritage.drawAllCorners
 import com.pratitin.app.ui.screens.events.newEvent
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
@@ -162,7 +163,6 @@ fun DayDetailSheet(shell: ShellState, date: Int, origin: Rect?, onDismiss: () ->
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(Modifier.size(44.dp, 5.dp).clip(Squircles.pill).background(Color.White.copy(alpha = 0.55f)))
-                Text(s.swipeHint, style = HeritageType.micro, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
             }
             CardStack(shell, date, onNavigate, Modifier.weight(1f).fillMaxWidth().padding(bottom = 12.dp))
         }
@@ -189,6 +189,17 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
     val lift = with(density) { 20.dp.toPx() }
 
     fun progress() = (abs(x) / (width * 0.55f)).coerceIn(0f, 1f)
+
+    // First open only: the top card peeks left and springs back, revealing tomorrow beneath —
+    // teaches the swipe without any hint text.
+    LaunchedEffect(Unit) {
+        if (!nudged) {
+            nudged = true
+            delay(650)
+            animate(0f, -width * 0.16f, 0f, spring(dampingRatio = 0.8f, stiffness = 300f)) { value, _ -> x = value }
+            animate(x, 0f, 0f, spring(dampingRatio = 0.55f, stiffness = 260f)) { value, _ -> x = value }
+        }
+    }
 
     Box(
         modifier
@@ -236,18 +247,22 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
         })
         val prev = Day.plusDays(date, -1)
         val next = Day.plusDays(date, 1)
-        // z-order = loop order; the top card is always last
-        for (d in listOf(prev, next, date)) {
+        // Window of five: ±1 are ready to rise; ±2 are built (hidden, when idle) so that after a
+        // swap the new neighbour already exists and nothing heavy is composed mid-gesture.
+        // z-order = loop order; the top card is always last.
+        for (d in listOf(Day.plusDays(date, -2), Day.plusDays(date, 2), prev, next, date)) {
             key(d) {
-                DayCard(shell, d, eager = d == date, modifier = Modifier.fillMaxSize().graphicsLayer {
+                DayCard(shell, d, eager = d == date, delayMs = if (d == prev || d == next) 320L else 800L, modifier = Modifier.fillMaxSize().graphicsLayer {
                     when (d) {
                         date -> {
                             translationX = x
                             translationY = abs(x) * 0.05f
                             rotationZ = x / width * 8f
+                            val sc = 1f - 0.03f * progress()
+                            scaleX = sc; scaleY = sc
                             transformOrigin = TransformOrigin(0.5f, 1.25f)
                         }
-                        else -> {
+                        prev, next -> {
                             // the neighbour on the side you're dragging toward rises up
                             val showing = if (d == next) x <= 0f else x > 0f
                             val k = if (showing) progress() else 0f
@@ -257,12 +272,16 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
                             translationY = lift * (1f - k)
                             alpha = if (showing) 1f else 0f
                         }
+                        else -> alpha = 0f // far neighbours: composed but never drawn
                     }
                 })
             }
         }
     }
 }
+
+/** Process-wide: the teaching nudge plays once per app session. */
+private var nudged = false
 
 @Composable
 private fun DeckCard(modifier: Modifier) {
@@ -276,7 +295,7 @@ private fun DeckCard(modifier: Modifier) {
 
 /** A solid "physical" day card — lacquer surface, gilded rim and kbach corners. */
 @Composable
-private fun DayCard(shell: ShellState, d: Int, eager: Boolean, modifier: Modifier) {
+private fun DayCard(shell: ShellState, d: Int, eager: Boolean, delayMs: Long, modifier: Modifier) {
     val p = LocalPalette.current
     val s = LocalStrings.current
     val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
@@ -286,7 +305,8 @@ private fun DayCard(shell: ShellState, d: Int, eager: Boolean, modifier: Modifie
     // A neighbour composed during a swap shows its light header first and fills in its full
     // content on the next frame, so the swap frame itself stays cheap.
     var full by remember { mutableStateOf(eager) }
-    LaunchedEffect(Unit) { if (!full) { withFrameNanos { }; full = true } }
+    // staggered so opening the sheet never composes several heavy cards in one frame
+    LaunchedEffect(Unit) { if (!full) { withFrameNanos { }; delay(delayMs); full = true } }
     val surface = remember(p.isDark) {
         if (p.isDark) Brush.verticalGradient(listOf(Color(0xFF231629), Color(0xFF140C1B)))
         else Brush.verticalGradient(listOf(Color(0xFFFFFAF1), Color(0xFFF3E4CC)))
@@ -358,10 +378,10 @@ private fun DayContent(
     }
     Spacer(Modifier.height(12.dp))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (k.isSilaDay(dim)) Badge("☸ ${s.silaDay}", p.gold)
-        if (k.isFullMoon) Badge("🌕 ${s.fullMoon}", p.moon)
-        if (k.dayNumber == dim - 1) Badge("🌑 ${s.newMoon}", p.inkSoft)
-        when (KhmerCalendar.leapKind(k.beYear)) { 1 -> Badge(s.leapMonth, p.lotus); 2 -> Badge(s.leapDay, p.jade) }
+        if (k.isSilaDay(dim)) Badge(s.silaDay, p.gold, icon = Icons.wheel)
+        if (k.isFullMoon) Badge(s.fullMoon, p.moon, icon = Icons.fullMoon)
+        if (k.dayNumber == dim - 1) Badge(s.newMoon, p.inkSoft, icon = Icons.newMoon)
+        when (KhmerCalendar.leapKind(k.beYear)) { 1 -> Badge(s.leapMonth, p.lotus, icon = Icons.leap); 2 -> Badge(s.leapDay, p.jade) }
     }
 
     if (isSongkran) {

@@ -43,6 +43,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pratitin.app.ui.glass.Backdrop
 import com.pratitin.app.ui.glass.glass
 import com.pratitin.app.ui.heritage.drawLotus
@@ -170,11 +171,24 @@ fun GlassIconButton(backdrop: Backdrop?, onClick: () -> Unit, modifier: Modifier
 }
 
 @Composable
-fun Badge(text: String, color: Color, modifier: Modifier = Modifier, filled: Boolean = false) {
-    Text(
-        text, style = HeritageType.micro, color = if (filled) Color.White else color, maxLines = 1,
-        modifier = modifier.clip(Squircles.xs).background(if (filled) color else color.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 3.dp),
-    )
+fun Badge(
+    text: String, color: Color, modifier: Modifier = Modifier, filled: Boolean = false,
+    icon: (DrawScope.(Color) -> Unit)? = null,
+) {
+    // Fixed height + vector icons (no emoji): every badge in a row lines up exactly,
+    // whatever script or symbol it contains.
+    val fg = if (filled) Color.White else color
+    Row(
+        modifier.height(26.dp).clip(Squircles.pill).background(if (filled) color else color.copy(alpha = 0.16f))
+            .padding(start = if (icon != null) 8.dp else 10.dp, end = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Canvas(Modifier.size(12.dp)) { icon(fg) }
+            Spacer(Modifier.width(5.dp))
+        }
+        Text(text, style = HeritageType.micro.copy(lineHeight = 13.sp), color = fg, maxLines = 1)
+    }
 }
 
 @Composable
@@ -240,6 +254,20 @@ object Icons {
         drawLine(c, Offset(size.width * 0.2f, size.height * 0.2f), Offset(size.width * 0.8f, size.height * 0.8f), 2.2.dp.toPx(), StrokeCap.Round)
         drawLine(c, Offset(size.width * 0.8f, size.height * 0.2f), Offset(size.width * 0.2f, size.height * 0.8f), 2.2.dp.toPx(), StrokeCap.Round)
     }
+    /** Dharma wheel (ធម្មចក្រ) for Sila days. */
+    val wheel: DrawScope.(Color) -> Unit = { c ->
+        val r = size.minDimension / 2 - 0.5.dp.toPx()
+        drawCircle(c, r, style = Stroke(1.3.dp.toPx()))
+        for (k in 0 until 8) {
+            val a = Math.toRadians(k * 45.0)
+            drawLine(c, Offset(center.x + (r * 0.2f * kotlin.math.cos(a)).toFloat(), center.y + (r * 0.2f * kotlin.math.sin(a)).toFloat()),
+                Offset(center.x + (r * kotlin.math.cos(a)).toFloat(), center.y + (r * kotlin.math.sin(a)).toFloat()), 1.dp.toPx())
+        }
+        drawCircle(c, r * 0.22f)
+    }
+    val fullMoon: DrawScope.(Color) -> Unit = { c -> drawCircle(c, size.minDimension / 2) }
+    val newMoon: DrawScope.(Color) -> Unit = { c -> drawCircle(c, size.minDimension / 2 - 0.7.dp.toPx(), style = Stroke(1.3.dp.toPx())) }
+    val leap: DrawScope.(Color) -> Unit = { c -> drawLotus(Offset(center.x, size.height * 0.95f), size.height * 0.95f, 0.9f, c, c) }
     val target: DrawScope.(Color) -> Unit = { c ->
         drawCircle(c, size.minDimension * 0.42f, style = sw()); drawCircle(c, size.minDimension * 0.16f)
     }
