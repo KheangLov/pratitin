@@ -19,7 +19,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.pratitin.app.data.UserEvent
 import com.pratitin.app.ui.heritage.drawAllCorners
 import com.pratitin.app.ui.screens.events.newEvent
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import kotlin.math.abs
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
@@ -167,114 +170,145 @@ fun DayDetailSheet(shell: ShellState, date: Int, origin: Rect?, onDismiss: () ->
 }
 
 /**
- * Three-deep card stack. The top card follows the finger with a slight tilt; the card
- * beneath rises and scales up as you drag; release past ~30 % (or flick) and the top
- * card flies off while the next one settles into place. All motion is graphicsLayer-only.
+ * Card deck. Smoothness rules:
+ *  - The finger offset is a plain float state, written directly from the gesture and read
+ *    only inside graphicsLayer — dragging never recomposes and never launches coroutines.
+ *  - Yesterday, today and tomorrow are all composed ahead of time and keyed by date inside
+ *    one loop, so when you swap, Compose *moves* the already-built card to the top instead
+ *    of rebuilding it. Only the new far neighbour is composed, hidden, a frame later.
  */
 @Composable
 private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, modifier: Modifier) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    val offset = remember { Animatable(0f) }
+    var x by remember { mutableFloatStateOf(0f) }
     var width by remember { mutableFloatStateOf(1f) }
-    // Only flips when the drag direction changes, so dragging doesn't recompose every frame.
-    val forward by remember { derivedStateOf { offset.value <= 0f } }
-    val backDate = if (forward) Day.plusDays(date, 1) else Day.plusDays(date, -1)
-    val deepDate = if (forward) Day.plusDays(date, 2) else Day.plusDays(date, -2)
+    var settleJob by remember { mutableStateOf<Job?>(null) }
+    val currentDate by rememberUpdatedState(date)
     val density = LocalDensity.current
+    val lift = with(density) { 20.dp.toPx() }
+
+    fun progress() = (abs(x) / (width * 0.55f)).coerceIn(0f, 1f)
 
     Box(
         modifier
             .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
-            .pointerInput(date) {
+            .pointerInput(Unit) {
                 val tracker = VelocityTracker()
                 detectHorizontalDragGestures(
-                    onDragStart = { tracker.resetTracking() },
+                    onDragStart = { settleJob?.cancel(); tracker.resetTracking() },
                     onHorizontalDrag = { change, dx ->
                         tracker.addPosition(change.uptimeMillis, change.position)
                         change.consume()
-                        scope.launch { offset.snapTo(offset.value + dx) }
+                        x += dx
                     },
                     onDragEnd = {
                         val v = tracker.calculateVelocity().x
-                        scope.launch {
-                            val dir = when {
-                                offset.value < -width * 0.3f || v < -1400f -> 1
-                                offset.value > width * 0.3f || v > 1400f -> -1
-                                else -> 0
-                            }
+                        val dir = when {
+                            x < -width * 0.28f || (v < -900f && x < 0f) -> 1
+                            x > width * 0.28f || (v > 900f && x > 0f) -> -1
+                            else -> 0
+                        }
+                        settleJob = scope.launch {
                             if (dir == 0) {
-                                offset.animateTo(0f, spring(dampingRatio = 0.62f, stiffness = 420f), initialVelocity = v)
+                                animate(x, 0f, v, spring(dampingRatio = 0.7f, stiffness = 500f)) { value, _ -> x = value }
                             } else {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                offset.animateTo(-dir * width * 1.25f, spring(dampingRatio = 1f, stiffness = 420f), initialVelocity = v)
-                                onNavigate(Day.plusDays(date, dir.toLong()))
-                                offset.snapTo(0f)
+                                // fly out along the flick; the card below is already rising with it
+                                animate(x, -dir * width * 1.3f, v, spring(dampingRatio = 1f, stiffness = 600f)) { value, _ -> x = value }
+                                // same frame: new top card, offset reset → seamless hand-off
+                                onNavigate(Day.plusDays(currentDate, dir.toLong()))
+                                x = 0f
                             }
                         }
                     },
-                    onDragCancel = { scope.launch { offset.animateTo(0f, spring(dampingRatio = 0.7f)) } },
+                    onDragCancel = { settleJob = scope.launch { animate(x, 0f, 0f, spring(dampingRatio = 0.7f)) { value, _ -> x = value } } },
                 )
             },
     ) {
-        // deepest card: a peek of the day after next, for a sense of depth
-        DayCard(shell, deepDate, preview = true, Modifier.fillMaxSize().graphicsLayer {
-            val k = (abs(offset.value) / (width * 0.6f)).coerceIn(0f, 1f)
+        // bottom of the deck: an empty card for depth (cheap — no content)
+        DeckCard(Modifier.fillMaxSize().graphicsLayer {
+            val k = progress()
             val sc = 0.88f + 0.06f * k
             scaleX = sc; scaleY = sc
-            translationY = with(density) { (34.dp - 14.dp * k).toPx() }
-            alpha = 0.55f + 0.3f * k
+            translationY = lift * (1.7f - 0.7f * k)
+            alpha = 0.6f + 0.3f * k
         })
-        // the card that will become the top card
-        key(backDate) {
-            DayCard(shell, backDate, preview = false, Modifier.fillMaxSize().graphicsLayer {
-                val k = (abs(offset.value) / (width * 0.6f)).coerceIn(0f, 1f)
-                val sc = 0.94f + 0.06f * k
-                scaleX = sc; scaleY = sc
-                translationY = with(density) { (20.dp * (1f - k)).toPx() }
-                alpha = 0.85f + 0.15f * k
-            })
-        }
-        // top card
-        key(date) {
-            DayCard(shell, date, preview = false, Modifier.fillMaxSize().graphicsLayer {
-                translationX = offset.value
-                translationY = abs(offset.value) * 0.06f
-                rotationZ = offset.value / width * 9f
-                transformOrigin = TransformOrigin(0.5f, 1.2f)
-            })
+        val prev = Day.plusDays(date, -1)
+        val next = Day.plusDays(date, 1)
+        // z-order = loop order; the top card is always last
+        for (d in listOf(prev, next, date)) {
+            key(d) {
+                DayCard(shell, d, eager = d == date, modifier = Modifier.fillMaxSize().graphicsLayer {
+                    when (d) {
+                        date -> {
+                            translationX = x
+                            translationY = abs(x) * 0.05f
+                            rotationZ = x / width * 8f
+                            transformOrigin = TransformOrigin(0.5f, 1.25f)
+                        }
+                        else -> {
+                            // the neighbour on the side you're dragging toward rises up
+                            val showing = if (d == next) x <= 0f else x > 0f
+                            val k = if (showing) progress() else 0f
+                            val sc = 0.94f + 0.06f * k
+                            scaleX = sc; scaleY = sc
+                            translationX = 0f; rotationZ = 0f
+                            translationY = lift * (1f - k)
+                            alpha = if (showing) 1f else 0f
+                        }
+                    }
+                })
+            }
         }
     }
 }
 
+@Composable
+private fun DeckCard(modifier: Modifier) {
+    val p = LocalPalette.current
+    Box(
+        modifier.clip(Squircles.xl)
+            .background(if (p.isDark) Color(0xFF1B1121) else Color(0xFFF1E2C8))
+            .border(1.dp, p.gold.copy(alpha = 0.3f), Squircles.xl),
+    )
+}
+
 /** A solid "physical" day card — lacquer surface, gilded rim and kbach corners. */
 @Composable
-private fun DayCard(shell: ShellState, d: Int, preview: Boolean, modifier: Modifier) {
+private fun DayCard(shell: ShellState, d: Int, eager: Boolean, modifier: Modifier) {
     val p = LocalPalette.current
+    val s = LocalStrings.current
     val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
     val moods by shell.vm.moods.collectAsStateWithLifecycle()
     val events by shell.vm.events.collectAsStateWithLifecycle()
     val today by shell.vm.today.collectAsStateWithLifecycle()
-    val surface = if (p.isDark) Brush.verticalGradient(listOf(Color(0xFF231629), Color(0xFF140C1B)))
-    else Brush.verticalGradient(listOf(Color(0xFFFFFAF1), Color(0xFFF3E4CC)))
+    // A neighbour composed during a swap shows its light header first and fills in its full
+    // content on the next frame, so the swap frame itself stays cheap.
+    var full by remember { mutableStateOf(eager) }
+    LaunchedEffect(Unit) { if (!full) { withFrameNanos { }; full = true } }
+    val surface = remember(p.isDark) {
+        if (p.isDark) Brush.verticalGradient(listOf(Color(0xFF231629), Color(0xFF140C1B)))
+        else Brush.verticalGradient(listOf(Color(0xFFFFFAF1), Color(0xFFF3E4CC)))
+    }
+    val dayEvents = remember(events, d) { events.filter { it.occursOn(d) }.sortedWith(compareBy({ !it.allDay }, { it.startMin })) }
     Box(
         modifier
-            .shadow(18.dp, Squircles.xl, ambientColor = Color.Black, spotColor = Color.Black)
+            .shadow(10.dp, Squircles.xl, ambientColor = Color.Black, spotColor = Color.Black)
             .clip(Squircles.xl)
             .background(surface)
             .border(1.dp, p.gold.copy(alpha = 0.45f), Squircles.xl)
             .drawBehind { drawAllCorners(p.gold.copy(alpha = 0.35f), 20.dp.toPx()) },
     ) {
-        if (preview) {
+        if (!full) {
             val k = remember(d) { khmerOf(d) }
-            val s = LocalStrings.current
-            Column(Modifier.padding(22.dp)) {
-                Text(s.num(Day.dom(d)), style = HeritageType.number, color = p.ink.copy(alpha = 0.5f))
+            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(s.num(Day.dom(d)), style = HeritageType.number, color = p.ink)
                 Text(lunarLine(k, s), style = HeritageType.title, color = p.inkSoft)
             }
         } else {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp)) {
-                DayContent(shell, d, today, settings, moods[d]?.mood, moods[d]?.note.orEmpty(), events.filter { it.occursOn(d) }.sortedWith(compareBy({ !it.allDay }, { it.startMin })))
+                DayContent(shell, d, today, settings, moods[d]?.mood, moods[d]?.note.orEmpty(), dayEvents)
             }
         }
     }
