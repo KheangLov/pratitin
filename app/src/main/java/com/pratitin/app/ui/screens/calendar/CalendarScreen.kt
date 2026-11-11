@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pratitin.app.data.Lang
 import com.pratitin.app.data.MoodEntry
+import com.pratitin.app.data.UserEvent
 import com.pratitin.app.data.Settings
 import com.pratitin.app.ui.LocalStrings
 import com.pratitin.app.ui.ShellState
@@ -107,6 +108,7 @@ fun CalendarScreen(shell: ShellState) {
     val today by shell.vm.today.collectAsStateWithLifecycle()
     val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
     val moods by shell.vm.moods.collectAsStateWithLifecycle()
+    val events by shell.vm.events.collectAsStateWithLifecycle()
     val s = LocalStrings.current
     val p = LocalPalette.current
     val scope = rememberCoroutineScope()
@@ -157,7 +159,7 @@ fun CalendarScreen(shell: ShellState) {
         // Each pill is both the legend (its marker matches the one drawn in the cells)
         // and a filter: tap to spotlight those days in the grid, tap again to clear.
         item(key = "pills") {
-            val monthCells = remember(year, month, settings, s, p, moods) { buildCells(year, month, settings, s, p, moods) }
+            val monthCells = remember(year, month, settings, s, p, moods, events) { buildCells(year, month, settings, s, p, moods, events) }
             fun count(f: Focus) = monthCells.count { it.inMonth && it.matches(f) }
             LazyRow(Modifier.enterStagger(1), horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
                 Focus.entries.forEach { f ->
@@ -183,7 +185,7 @@ fun CalendarScreen(shell: ShellState) {
                     val m = pg % 12 + 1
                     MonthGrid(
                         year = y, month = m, today = today, selected = { selected },
-                        settings = settings, moods = moods, focus = focus,
+                        settings = settings, moods = moods, events = events, focus = focus,
                         onTap = { d, rect ->
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (d == selected) shell.openDay(d, rect) else selected = d
@@ -198,7 +200,7 @@ fun CalendarScreen(shell: ShellState) {
         // ------------------------------------------------------------ spotlight list / selected day
         val f = focus
         if (f != null) item(key = "matches-${f.name}") {
-            FocusStrip(shell, f, year, month, settings, moods, Modifier.enterStagger(3))
+            FocusStrip(shell, f, year, month, settings, moods, events, Modifier.enterStagger(3))
         }
         item(key = "selected") {
             SelectedDayCard(shell, selected, settings, moods[selected], Modifier.enterStagger(4))
@@ -255,10 +257,10 @@ private fun WeekdayHeader(monday: Boolean, s: Strings) {
 
 /** What the highlight pills can spotlight. */
 enum class Focus {
-    KHMER, SILA, GLOBAL, MOOD;
+    EVENTS, KHMER, SILA, GLOBAL, MOOD;
 
-    fun label(s: Strings) = when (this) { KHMER -> s.publicHoliday; SILA -> s.silaDay; GLOBAL -> s.global; MOOD -> s.tabMood }
-    fun color(p: HeritagePalette) = when (this) { KHMER -> p.holidayKhmer; SILA -> p.gold; GLOBAL -> p.holidayGlobal; MOOD -> p.lotus }
+    fun label(s: Strings) = when (this) { EVENTS -> s.schedule; KHMER -> s.publicHoliday; SILA -> s.silaDay; GLOBAL -> s.global; MOOD -> s.tabMood }
+    fun color(p: HeritagePalette) = when (this) { EVENTS -> p.jade; KHMER -> p.holidayKhmer; SILA -> p.gold; GLOBAL -> p.holidayGlobal; MOOD -> p.lotus }
 }
 
 /** Pre-computed, immutable model of one month page — built once per (month, inputs). */
@@ -267,13 +269,15 @@ private class Cell(
     val publicHoliday: Boolean, val observance: Boolean, val global: Boolean,
     val sila: Boolean, val moon: Int, // 0 none, 1 full, 2 new
     val mood: Color?, val weekend: Boolean,
+    val events: List<Color> = emptyList(),
 ) {
     fun matches(f: Focus) = when (f) {
+        Focus.EVENTS -> events.isNotEmpty()
         Focus.KHMER -> publicHoliday; Focus.SILA -> sila; Focus.GLOBAL -> global; Focus.MOOD -> mood != null
     }
 }
 
-private fun buildCells(year: Int, month: Int, s: Settings, strings: Strings, p: HeritagePalette, moods: Map<Int, MoodEntry>): List<Cell> {
+private fun buildCells(year: Int, month: Int, s: Settings, strings: Strings, p: HeritagePalette, moods: Map<Int, MoodEntry>, events: List<UserEvent> = emptyList()): List<Cell> {
     val first = year * 10000 + month * 100 + 1
     val wd = Day.weekday(first)
     val lead = if (s.weekStartsMonday) (wd + 6) % 7 else wd
@@ -295,6 +299,7 @@ private fun buildCells(year: Int, month: Int, s: Settings, strings: Strings, p: 
             moon = when { k.isFullMoon -> 1; k.dayNumber == dim - 1 -> 2; else -> 0 },
             mood = moods[d]?.mood?.color,
             weekend = w == 0 || w == 6,
+            events = if (events.isEmpty()) emptyList() else events.filter { it.occursOn(d) }.take(3).map { it.colorValue },
         )
     }
 }
@@ -317,6 +322,7 @@ private fun DrawScope.drawFocusMarker(f: Focus, c: Offset, color: Color) {
         Focus.SILA -> drawSilaWheel(c, 5f * u, color)
         Focus.KHMER, Focus.GLOBAL -> drawRoundRect(color, Offset(c.x - 5f * u, c.y - 1.5f * u), Size(10f * u, 3f * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u))
         Focus.MOOD -> drawRoundRect(color, Offset(c.x - 5f * u, c.y - 1.5f * u), Size(10f * u, 3f * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u))
+        Focus.EVENTS -> { drawCircle(color, 2.6f * u, Offset(c.x - 3.5f * u, c.y)); drawCircle(color.copy(alpha = 0.6f), 2.6f * u, Offset(c.x + 3.5f * u, c.y)) }
     }
 }
 
@@ -344,10 +350,10 @@ private fun HighlightPill(label: String, count: String, color: Color, marker: Fo
 
 /** When a pill is active: every matching day of the month as tappable tiles. */
 @Composable
-private fun FocusStrip(shell: ShellState, f: Focus, year: Int, month: Int, settings: Settings, moods: Map<Int, MoodEntry>, modifier: Modifier) {
+private fun FocusStrip(shell: ShellState, f: Focus, year: Int, month: Int, settings: Settings, moods: Map<Int, MoodEntry>, events: List<UserEvent>, modifier: Modifier) {
     val p = LocalPalette.current
     val s = LocalStrings.current
-    val cells = remember(year, month, settings, s, p, moods) { buildCells(year, month, settings, s, p, moods).filter { it.inMonth && it.matches(f) } }
+    val cells = remember(year, month, settings, s, p, moods, events) { buildCells(year, month, settings, s, p, moods, events).filter { it.inMonth && it.matches(f) } }
     val color = f.color(p)
     GlassCard(shell.bg, modifier.fillMaxWidth(), padding = PaddingValues(12.dp)) {
         if (cells.isEmpty()) {
@@ -358,6 +364,7 @@ private fun FocusStrip(shell: ShellState, f: Focus, year: Int, month: Int, setti
                 val hol = remember(c.date, settings) { holidaysOn(c.date, settings) }
                 val sub = when (f) {
                     Focus.SILA -> c.lunar
+                    Focus.EVENTS -> events.firstOrNull { it.occursOn(c.date) }?.kind?.emoji ?: ""
                     Focus.MOOD -> moods[c.date]?.mood?.emoji ?: ""
                     Focus.KHMER -> hol.firstOrNull { it.kind == HolidayKind.KHMER_PUBLIC }?.emoji ?: ""
                     Focus.GLOBAL -> hol.firstOrNull { it.kind == HolidayKind.GLOBAL }?.emoji ?: ""
@@ -380,13 +387,13 @@ private fun FocusStrip(shell: ShellState, f: Focus, year: Int, month: Int, setti
 @Composable
 private fun MonthGrid(
     year: Int, month: Int, today: Int, selected: () -> Int,
-    settings: Settings, moods: Map<Int, MoodEntry>, focus: Focus?,
+    settings: Settings, moods: Map<Int, MoodEntry>, events: List<UserEvent>, focus: Focus?,
     onTap: (Int, Rect?) -> Unit,
 ) {
     val p = LocalPalette.current
     val s = LocalStrings.current
     val measurer = rememberTextMeasurer(cacheSize = 192)
-    val cells = remember(year, month, settings, s, p, moods) { buildCells(year, month, settings, s, p, moods) }
+    val cells = remember(year, month, settings, s, p, moods, events) { buildCells(year, month, settings, s, p, moods, events) }
     var gridOrigin by remember { mutableStateOf(Offset.Zero) }
 
     // Selection highlight glides between cells with a spring (draw-phase only).
@@ -489,6 +496,13 @@ private fun MonthGrid(
                         val (domL, lunL) = layouts[i]
                         drawCentered(domL, x + cw / 2, y + ch * 0.42f, dim)
                         drawCentered(lunL, x + cw / 2, y + ch * 0.72f, dim)
+                        // your events: coloured dots in the top-left corner
+                        cell.events.forEachIndexed { k, ec ->
+                            drawCircle(
+                                (if (isToday) p.night else ec).copy(alpha = (if (cell.inMonth) 1f else 0.35f) * dim),
+                                2.4f * u, Offset(x + inset + (7f + k * 5.5f) * u, y + inset + 8 * u),
+                            )
+                        }
                         // moon / Sila mark — top-right corner
                         val mx = x + cw - inset - 8 * u
                         val my = y + inset + 8 * u

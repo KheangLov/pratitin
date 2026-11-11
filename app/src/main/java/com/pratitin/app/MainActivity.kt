@@ -1,6 +1,8 @@
 package com.pratitin.app
 
 import android.app.Application
+import android.content.Intent
+import com.pratitin.app.notify.Reminders
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -18,6 +20,8 @@ import kotlin.concurrent.thread
 class PratitinApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        Reminders.createChannels(this)
+        Reminders.rescheduleAsync(this)
         // Warm the lunar tables off the main thread so the first frame never computes them.
         thread(name = "chhankitek-prefetch", priority = Thread.MIN_PRIORITY) {
             val y = LocalDate.now().year
@@ -39,7 +43,19 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        handleIntent(intent)
         setContent { AppRoot(vm) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    /** A notification tap carries the day it's about — open that day's card. */
+    private fun handleIntent(intent: Intent?) {
+        val d = intent?.getIntExtra(Reminders.EXTRA_DATE, 0) ?: 0
+        if (d != 0) { vm.pendingOpen.value = d; intent?.removeExtra(Reminders.EXTRA_DATE) }
     }
 
     override fun onResume() {

@@ -25,6 +25,13 @@ data class Strings(
     val livingSky: String, val weekStartsMonday: String, val maxLeave: String, val about: String, val aboutBody: String,
     val leapMonth: String, val leapDay: String, val songkranAt: String, val days: String, val weeks: String, val years: String,
     val weekdaysShort: List<String>, val monthNames: List<String>,
+    // events & reminders
+    val events: String, val addEvent: String, val editEvent: String, val titleHint: String, val allDay: String,
+    val startTime: String, val duration: String, val repeat: String, val remind: String, val delete: String, val color: String,
+    val repeatNames: List<String>, val schedule: String, val noEvents: String, val swipeHint: String,
+    val reminders: String, val enableReminders: String, val rHolidays: String, val rGlobal: String, val rSila: String,
+    val rNewYear: String, val rMood: String, val rWhen: String, val rEve: String, val rMorning: String, val permissionDenied: String,
+    val date: String,
     /** Khmer digits (០១២…) vs Arabic digits — user setting, only meaningful in Khmer. */
     val khmerDigits: Boolean = lang == Lang.KM,
 ) {
@@ -57,6 +64,14 @@ val KhmerStrings = Strings(
     about = "អំពី", aboutBody = "គណនាតាមក្បួនចន្ទគតិ (សុរិយាត្រ) • ថ្ងៃឈប់សម្រាកតាមអនុក្រឹត្យរាជរដ្ឋាភិបាល",
     leapMonth = "អធិកមាស", leapDay = "ចន្ទ្រាធិមាស", songkranAt = "ទេវតាចុះ", days = "ថ្ងៃ", weeks = "សប្ដាហ៍", years = "ឆ្នាំ",
     weekdaysShort = KhmerNames.WEEKDAYS_SHORT.toList(), monthNames = KhmerNames.SOLAR_MONTHS.toList(),
+    events = "ព្រឹត្តិការណ៍ និងកំណត់ចំណាំ", addEvent = "បន្ថែម", editEvent = "កែប្រែ", titleHint = "ចំណងជើង…", allDay = "ពេញមួយថ្ងៃ",
+    startTime = "ម៉ោង", duration = "រយៈពេល", repeat = "ធ្វើម្ដងទៀត", remind = "រំលឹក", delete = "លុប", color = "ពណ៌",
+    repeatNames = listOf("ម្ដង", "រៀងរាល់ថ្ងៃ", "រៀងរាល់សប្ដាហ៍", "រៀងរាល់ខែ", "រៀងរាល់ឆ្នាំ", "ប្រចាំឆ្នាំ (ចន្ទគតិ)"),
+    schedule = "កាលវិភាគ", noEvents = "មិនទាន់មានព្រឹត្តិការណ៍ — ចុច + ដើម្បីបន្ថែម", swipeHint = "អូសឆ្វេង/ស្ដាំ ដើម្បីប្ដូរថ្ងៃ",
+    reminders = "ការរំលឹក", enableReminders = "បើកការជូនដំណឹង", rHolidays = "ថ្ងៃឈប់សម្រាក", rGlobal = "ថ្ងៃបុណ្យអន្តរជាតិ",
+    rSila = "ថ្ងៃសីល និងពិធីបុណ្យ", rNewYear = "ចូលឆ្នាំខ្មែរ (ម៉ោងទេវតាចុះ)", rMood = "រំលឹកកត់ត្រាអារម្មណ៍ ម៉ោង ៩ យប់",
+    rWhen = "ពេលរំលឹកថ្ងៃបុណ្យ", rEve = "ល្ងាចមុន ម៉ោង ៧", rMorning = "ព្រឹកនោះ ម៉ោង ៧",
+    permissionDenied = "សូមអនុញ្ញាតការជូនដំណឹងក្នុងការកំណត់ទូរស័ព្ទ", date = "កាលបរិច្ឆេទ",
 )
 
 val EnglishStrings = Strings(
@@ -83,6 +98,14 @@ val EnglishStrings = Strings(
     about = "About", aboutBody = "Lunar dates follow the Chhankitek (Soriyatra) reckoning • Public holidays follow the Royal Government sub-decrees",
     leapMonth = "Adhikameas · leap month", leapDay = "Chantrathimeas · leap day", songkranAt = "Tevoda descends", days = "days", weeks = "weeks", years = "years",
     weekdaysShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"), monthNames = EN_MONTHS,
+    events = "Events & notes", addEvent = "Add", editEvent = "Edit", titleHint = "Title…", allDay = "All day",
+    startTime = "Time", duration = "Duration", repeat = "Repeat", remind = "Remind", delete = "Delete", color = "Colour",
+    repeatNames = listOf("Once", "Daily", "Weekly", "Monthly", "Yearly", "Yearly (lunar)"),
+    schedule = "Schedule", noEvents = "Nothing planned — tap + to add", swipeHint = "Swipe left/right to change day",
+    reminders = "Reminders", enableReminders = "Enable notifications", rHolidays = "Public holidays", rGlobal = "Global days",
+    rSila = "Sila & Buddhist days", rNewYear = "Khmer New Year (Songkran moment)", rMood = "Mood check-in at 9 PM",
+    rWhen = "Holiday reminder time", rEve = "Evening before, 7 PM", rMorning = "That morning, 7 AM",
+    permissionDenied = "Allow notifications in your phone settings", date = "Date",
 )
 
 val LocalStrings = staticCompositionLocalOf { KhmerStrings }

@@ -4,6 +4,11 @@ import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.imageResource
+import com.pratitin.app.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,8 +33,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.pratitin.app.ui.glass.CAN_REFRACT
 import com.pratitin.app.ui.glass.Shaders
-import com.pratitin.app.ui.heritage.buildSkyline
-import com.pratitin.app.ui.heritage.drawAngkor
 import com.pratitin.app.ui.theme.HeritagePalette
 import com.pratitin.app.ui.theme.LocalPalette
 import kotlin.math.sin
@@ -74,23 +77,22 @@ fun HeritageSky(animate: Boolean, parallax: () -> Float, modifier: Modifier = Mo
             }
         }
 
-        // ---- Angkor skyline + moat, with parallax (graphicsLayer → no recomposition on scroll)
-        Column(
-            Modifier.fillMaxWidth().fillMaxHeight(0.30f).align(Alignment.BottomCenter)
-                .graphicsLayer { translationY = parallax() * 60.dp.toPx(); alpha = 1f - parallax() * 0.4f },
-        ) {
-            Box(
-                Modifier.fillMaxWidth().weight(0.72f).drawWithCache {
-                    val sky = buildSkyline(size)
-                    val silhouette = if (p.isDark) Color(0xFF07050F) else Color(0xFF6B4A2E).copy(alpha = 0.55f)
-                    onDrawBehind { drawAngkor(sky, silhouette, p.gold, Color.Transparent, reflection = true) }
-                },
-            )
-            Box(
-                Modifier.fillMaxWidth().weight(0.28f)
-                    .background(Brush.verticalGradient(listOf(p.night.copy(alpha = 0.35f), p.nightDeep.copy(alpha = 0.95f)))),
-            )
-        }
+        // ---- Angkor Wat at the reflecting pool: two painted layers (temple + water, then
+        // palms + reeds) that drift at different speeds on scroll for depth parallax.
+        val backId = if (p.isDark) R.drawable.angkor_back_dusk else R.drawable.angkor_back_day
+        val frontId = if (p.isDark) R.drawable.angkor_front_dusk else R.drawable.angkor_front_day
+        val back = ImageBitmap.imageResource(backId)
+        val front = ImageBitmap.imageResource(frontId)
+        Image(
+            back, contentDescription = null, contentScale = ContentScale.FillWidth, alignment = Alignment.BottomCenter,
+            modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter)
+                .graphicsLayer { translationY = parallax() * 40.dp.toPx(); alpha = 1f - parallax() * 0.35f },
+        )
+        Image(
+            front, contentDescription = null, contentScale = ContentScale.FillWidth, alignment = Alignment.BottomCenter,
+            modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter)
+                .graphicsLayer { translationY = parallax() * 90.dp.toPx(); alpha = 1f - parallax() * 0.5f },
+        )
     }
 }
 

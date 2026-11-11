@@ -4,6 +4,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -59,6 +74,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pratitin.app.AppViewModel
 import com.pratitin.app.data.Lang
+import com.pratitin.app.data.UserEvent
+import com.pratitin.app.ui.screens.events.EventEditorSheet
 import com.pratitin.app.data.ThemeMode
 import com.pratitin.app.ui.background.HeritageSky
 import com.pratitin.app.ui.components.Icons
@@ -93,6 +110,7 @@ class ShellState(
     val openSettings: () -> Unit,
     val goTo: (Tab) -> Unit,
     val reportScroll: (Float) -> Unit,
+    val editEvent: (UserEvent, Boolean) -> Unit,
 )
 
 @Composable
@@ -126,6 +144,7 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
     var detailDate by rememberSaveable { mutableIntStateOf(0) }
     var detailOrigin by remember { mutableStateOf<Rect?>(null) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Pair<UserEvent, Boolean>?>(null) }
     val scroll = remember { mutableFloatStateOf(0f) }
     val holder = rememberSaveableStateHolder()
 
@@ -136,11 +155,22 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
             openSettings = { settingsOpen = true },
             goTo = { tab = it },
             reportScroll = { scroll.floatValue = it },
+            editEvent = { e, isNew -> editing = e to isNew },
         )
     }
 
-    BackHandler(enabled = detailOpen || settingsOpen || tab != Tab.TODAY) {
+    // Notification tap → open that day's card.
+    val pendingOpen by vm.pendingOpen.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingOpen) {
+        if (pendingOpen != 0) {
+            detailDate = pendingOpen; detailOrigin = null; detailOpen = true
+            vm.pendingOpen.value = 0
+        }
+    }
+
+    BackHandler(enabled = editing != null || detailOpen || settingsOpen || tab != Tab.TODAY) {
         when {
+            editing != null -> editing = null
             detailOpen -> detailOpen = false
             settingsOpen -> settingsOpen = false
             else -> tab = Tab.TODAY
@@ -209,16 +239,34 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         AnimatedVisibility(visible = settingsOpen, enter = fadeIn(), exit = fadeOut()) {
             SettingsSheet(shell, onDismiss = { settingsOpen = false })
         }
+        // Event editor sits above everything (it can be opened from the day sheet).
+        val ed = editing
+        if (ed != null) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f))
+                .clickable(remember { MutableInteractionSource() }, null) { editing = null })
+        }
+        AnimatedVisibility(visible = ed != null, enter = fadeIn(), exit = fadeOut()) {
+            val keep = remember { arrayOfNulls<Pair<UserEvent, Boolean>>(1) }
+            if (ed != null) keep[0] = ed
+            keep[0]?.let { (e, isNew) -> EventEditorSheet(shell, e, isNew, onDismiss = { editing = null }) }
+        }
     }
 }
 
 // ------------------------------------------------------------------ liquid tab bar
 
+/**
+ * Floating liquid-glass tab bar. Tap a tab, or press and slide: the gold lens follows your
+ * finger (swelling slightly while held), ticks a haptic as it crosses each tab, and on
+ * release snaps to the nearest one. Its two edges ride different springs, so it stretches
+ * like a droplet when it travels.
+ */
 @Composable
 private fun LiquidTabBar(selected: Tab, backdrop: Backdrop, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val s = LocalStrings.current
     val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     val items = remember(s) {
         listOf(
             Triple(Tab.TODAY, s.tabToday, Icons.today), Triple(Tab.CALENDAR, s.tabCalendar, Icons.calendar),
@@ -226,48 +274,98 @@ private fun LiquidTabBar(selected: Tab, backdrop: Backdrop, onSelect: (Tab) -> U
             Triple(Tab.LIFE, s.tabLife, Icons.life),
         )
     }
-    // Leading edge springs fast, trailing edge lags: the indicator stretches like a droplet in motion.
-    val target = selected.ordinal.toFloat()
-    val fast by animateFloatAsState(target, spring(dampingRatio = 0.62f, stiffness = 520f), label = "fast")
-    val slow by animateFloatAsState(target, spring(dampingRatio = 0.78f, stiffness = 180f), label = "slow")
+    val currentSelected by rememberUpdatedState(selected)
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    val lead = remember { Animatable(selected.ordinal.toFloat()) }
+    val trail = remember { Animatable(selected.ordinal.toFloat()) }
+    var dragging by remember { mutableStateOf(false) }
+    val hold by animateFloatAsState(if (dragging) 1f else 0f, spring(dampingRatio = 0.55f, stiffness = 500f), label = "hold")
 
+    fun settle(index: Int) {
+        scope.launch { lead.animateTo(index.toFloat(), spring(dampingRatio = 0.62f, stiffness = 520f)) }
+        scope.launch { trail.animateTo(index.toFloat(), spring(dampingRatio = 0.78f, stiffness = 180f)) }
+    }
+    LaunchedEffect(selected) { if (!dragging) settle(selected.ordinal) }
+
+    val pad = 6.dp
     Box(
         modifier.fillMaxWidth().height(70.dp)
             .glass(backdrop, Squircles.pill, liquid = true, cornerRadius = 35.dp, tint = p.glassTint.copy(alpha = p.glassTint.alpha * 1.4f))
-            .clip(Squircles.pill),
+            .clip(Squircles.pill)
+            .pointerInput(items.size) {
+                val n = items.size
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val padPx = pad.toPx()
+                    val w = (size.width - padPx * 2) / n
+                    fun pos(x: Float) = ((x - padPx) / w - 0.5f).coerceIn(0f, n - 1f)
+                    var at = pos(down.position.x)
+                    val slop = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
+                    if (slop == null) {
+                        // a tap
+                        val t = items[at.roundToInt()].first
+                        if (t != currentSelected) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        currentOnSelect(t)
+                        return@awaitEachGesture
+                    }
+                    dragging = true
+                    var lastTab = at.roundToInt()
+                    horizontalDrag(slop.id) { change ->
+                        at = pos(change.position.x)
+                        change.consume()
+                        scope.launch { lead.snapTo(at) }
+                        scope.launch { trail.animateTo(at, spring(dampingRatio = 0.85f, stiffness = 380f)) }
+                        val nearest = at.roundToInt()
+                        if (nearest != lastTab) { lastTab = nearest; haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+                    }
+                    dragging = false
+                    val target = at.roundToInt()
+                    settle(target)
+                    currentOnSelect(items[target].first)
+                }
+            },
     ) {
-        Canvas(Modifier.fillMaxSize().padding(6.dp)) {
+        Canvas(Modifier.fillMaxSize().padding(pad)) {
             val w = size.width / items.size
-            val left = minOf(fast, slow) * w
-            val right = (maxOf(fast, slow) + 1f) * w
-            val stretch = (right - left - w) / w
-            val squeeze = 1f - stretch.coerceIn(0f, 1f) * 0.18f
-            val h = size.height * squeeze
+            val a = minOf(lead.value, trail.value)
+            val b = maxOf(lead.value, trail.value)
+            val stretch = (b - a).coerceIn(0f, 1f)
+            val squeeze = 1f - stretch * 0.16f + hold * 0.10f
+            val h = (size.height * squeeze).coerceAtMost(size.height + 8.dp.toPx())
+            val grow = hold * 6.dp.toPx()
+            val left = a * w - grow
+            val right = (b + 1f) * w + grow
             val top = (size.height - h) / 2
+            val r = CornerRadius(h / 2)
             drawRoundRect(
-                Brush.verticalGradient(listOf(p.gold.copy(alpha = 0.42f), p.gold.copy(alpha = 0.18f)), startY = top, endY = top + h),
-                topLeft = Offset(left, top), size = Size(right - left, h), cornerRadius = CornerRadius(h / 2),
+                Brush.verticalGradient(listOf(p.gold.copy(alpha = 0.42f + 0.1f * hold), p.gold.copy(alpha = 0.16f)), startY = top, endY = top + h),
+                topLeft = Offset(left, top), size = Size(right - left, h), cornerRadius = r,
+            )
+            // glassy highlight on the lens' upper half, stronger while held
+            drawRoundRect(
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f + 0.22f * hold), Color.Transparent), startY = top, endY = top + h * 0.55f),
+                topLeft = Offset(left + 3f, top + 2f), size = Size(right - left - 6f, h * 0.5f), cornerRadius = r,
             )
             drawRoundRect(
-                p.goldSoft.copy(alpha = 0.55f), topLeft = Offset(left, top), size = Size(right - left, h),
-                cornerRadius = CornerRadius(h / 2), style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
+                p.goldSoft.copy(alpha = 0.55f + 0.35f * hold), topLeft = Offset(left, top), size = Size(right - left, h),
+                cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke((1f + hold).dp.toPx()),
             )
         }
-        Row(Modifier.fillMaxSize().padding(6.dp)) {
-            items.forEach { (t, label, icon) ->
-                val sel = t == selected
-                val lift by animateFloatAsState(if (sel) 1f else 0f, Motion.bouncy, label = "lift")
+        Row(Modifier.fillMaxSize().padding(pad)) {
+            items.forEachIndexed { i, (t, label, icon) ->
+                // how close the lens is to this tab (0‥1) drives colour and lift
+                val near = (1f - abs(lead.value - i)).coerceIn(0f, 1f)
                 Column(
-                    Modifier.weight(1f).fillMaxSize().clip(Squircles.pill)
-                        .clickable(remember { MutableInteractionSource() }, null, role = Role.Tab) {
-                            if (t != selected) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelect(t)
-                        },
+                    Modifier.weight(1f).fillMaxSize().semantics {
+                        role = Role.Tab
+                        this.selected = t == selected
+                        contentDescription = label
+                    },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                 ) {
-                    val tint = lerpColor(p.inkSoft, if (p.isDark) p.goldSoft else p.goldDeep, lift)
-                    Canvas(Modifier.size(22.dp).graphicsLayer { val k = 1f + 0.12f * lift; scaleX = k; scaleY = k }) { icon(tint) }
+                    val tint = lerpColor(p.inkSoft, if (p.isDark) p.goldSoft else p.goldDeep, near)
+                    Canvas(Modifier.size(22.dp).graphicsLayer { val k = 1f + 0.14f * near + 0.08f * hold * near; scaleX = k; scaleY = k; translationY = -2.dp.toPx() * near }) { icon(tint) }
                     Text(label, style = HeritageType.micro, color = tint, maxLines = 1)
                 }
             }

@@ -1,5 +1,19 @@
 package com.pratitin.app.ui.screens.settings
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.pratitin.app.notify.Reminders
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +62,17 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
     val rise = remember { Animatable(1f) }
     LaunchedEffect(Unit) { rise.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 300f)) }
     fun upd(t: (com.pratitin.app.data.Settings) -> com.pratitin.app.data.Settings) = shell.vm.updateSettings(t)
+    val ctx = LocalContext.current
+    var denied by remember { mutableStateOf(false) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        denied = !granted
+        if (granted) upd { it.copy(notify = true) }
+    }
+    fun enableNotifications(on: Boolean) {
+        if (!on) { upd { it.copy(notify = false) }; return }
+        if (Build.VERSION.SDK_INT >= 33 && !Reminders.canPost(ctx)) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        else upd { it.copy(notify = true) }
+    }
 
     Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = 40.dp), contentAlignment = Alignment.BottomCenter) {
         GlassCard(
@@ -90,6 +115,26 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
                 SettingRow(s.setBirthday) {
                     GlassChip("→", false, shell.content) { onDismiss(); shell.goTo(Tab.LIFE) }
                 }
+                // ---- reminders
+                Spacer(Modifier.height(16.dp))
+                SectionTitle(s.reminders)
+                SettingRow("🔔 ${s.enableReminders}") { LiquidToggle(settings.notify, { v -> enableNotifications(v) }) }
+                if (denied) Text(s.permissionDenied, style = HeritageType.micro, color = p.holidayKhmer)
+                AnimatedVisibility(settings.notify, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                    Column {
+                        SettingRow("🇰🇭 ${s.rHolidays}") { LiquidToggle(settings.notifyHolidays, { v -> upd { it.copy(notifyHolidays = v) } }) }
+                        SettingRow("🎉 ${s.rNewYear}") { LiquidToggle(settings.notifyNewYear, { v -> upd { it.copy(notifyNewYear = v) } }) }
+                        SettingRow("☸ ${s.rSila}") { LiquidToggle(settings.notifySila, { v -> upd { it.copy(notifySila = v) } }) }
+                        SettingRow("🌍 ${s.rGlobal}") { LiquidToggle(settings.notifyGlobal, { v -> upd { it.copy(notifyGlobal = v) } }) }
+                        SettingRow("🪷 ${s.rMood}") { LiquidToggle(settings.notifyMood, { v -> upd { it.copy(notifyMood = v) } }) }
+                        Text(s.rWhen, style = HeritageType.micro, color = p.inkSoft, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            GlassChip(s.rEve, settings.holidayEve, shell.content, leading = "🌙") { upd { it.copy(holidayEve = true) } }
+                            GlassChip(s.rMorning, !settings.holidayEve, shell.content, leading = "☀️") { upd { it.copy(holidayEve = false) } }
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(16.dp))
                 SectionTitle(s.about)
                 Text(s.aboutBody, style = HeritageType.label, color = p.inkSoft, modifier = Modifier.padding(top = 6.dp))

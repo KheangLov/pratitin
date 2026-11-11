@@ -62,6 +62,8 @@ import com.pratitin.app.ui.motion.LocalReduceMotion
 import com.pratitin.app.ui.motion.Motion
 import com.pratitin.app.ui.motion.enterStagger
 import com.pratitin.app.ui.screens.ANIMAL_EMOJI
+import com.pratitin.app.ui.screens.detail.EventRow
+import com.pratitin.app.ui.screens.events.newEvent
 import com.pratitin.app.ui.screens.MoodPicker
 import com.pratitin.app.ui.screens.ScreenList
 import com.pratitin.app.ui.screens.gregorianLong
@@ -86,10 +88,18 @@ fun TodayScreen(shell: ShellState) {
     val today by shell.vm.today.collectAsStateWithLifecycle()
     val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
     val moods by shell.vm.moods.collectAsStateWithLifecycle()
+    val events by shell.vm.events.collectAsStateWithLifecycle()
     val s = LocalStrings.current
     val p = LocalPalette.current
 
     val k = remember(today) { khmerOf(today) }
+    // next occurrences over the coming two weeks
+    val upcoming = remember(events, today) {
+        (0L..13L).flatMap { i ->
+            val d = Day.plusDays(today, i)
+            events.filter { it.occursOn(d) }.sortedWith(compareBy({ !it.allDay }, { it.startMin })).map { d to it }
+        }.take(5)
+    }
     val todays = remember(today, settings) { holidaysOn(today, settings) }
     val next = remember(today, settings) { upcomingHolidays(Day.plusDays(today, 1), settings, 1).firstOrNull() }
 
@@ -173,6 +183,31 @@ fun TodayScreen(shell: ShellState) {
         // ---------------------------------------------------------------- week strip
         item(key = "week") {
             WeekStrip(shell, today, settings.weekStartsMonday, Modifier.enterStagger(3))
+        }
+
+        // ---------------------------------------------------------------- schedule
+        item(key = "schedule") {
+            GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(4)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitle(s.schedule, Modifier.weight(1f))
+                    Box(
+                        Modifier.size(34.dp).clip(Squircles.pill).background(p.gold)
+                            .clickable { shell.editEvent(newEvent(today), true) },
+                        contentAlignment = Alignment.Center,
+                    ) { Text("+", style = HeritageType.heading, color = p.night) }
+                }
+                Spacer(Modifier.height(8.dp))
+                if (upcoming.isEmpty()) Text(s.noEvents, style = HeritageType.label, color = p.inkSoft)
+                upcoming.forEach { (d, ev) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (d == today) s.today else gregorianShort(d, s),
+                            style = HeritageType.micro, color = p.gold, modifier = Modifier.width(58.dp),
+                        )
+                        EventRow(ev, onClick = { shell.editEvent(ev, false) }, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
         }
 
         // ---------------------------------------------------------------- mood

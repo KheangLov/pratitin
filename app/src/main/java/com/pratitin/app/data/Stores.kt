@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -40,11 +41,18 @@ class SettingsStore(private val context: Context) {
         val numerals = booleanPreferencesKey("khmer_numerals")
         val sky = booleanPreferencesKey("living_sky")
         val leave = intPreferencesKey("max_leave")
+        val notify = booleanPreferencesKey("notify")
+        val nHol = booleanPreferencesKey("n_holidays")
+        val nGlobal = booleanPreferencesKey("n_global")
+        val nSila = booleanPreferencesKey("n_sila")
+        val nNy = booleanPreferencesKey("n_newyear")
+        val nMood = booleanPreferencesKey("n_mood")
+        val nEve = booleanPreferencesKey("n_eve")
     }
 
-    val settings: Flow<Settings> = context.dataStore.data.map { p ->
+    private fun read(p: Preferences): Settings {
         val d = Settings()
-        Settings(
+        return Settings(
             lang = p[K.lang]?.let { runCatching { Lang.valueOf(it) }.getOrNull() } ?: d.lang,
             theme = p[K.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: d.theme,
             birthDate = p[K.birth] ?: d.birthDate,
@@ -56,25 +64,33 @@ class SettingsStore(private val context: Context) {
             khmerNumerals = p[K.numerals] ?: d.khmerNumerals,
             livingSky = p[K.sky] ?: d.livingSky,
             maxLeave = p[K.leave] ?: d.maxLeave,
+            notify = p[K.notify] ?: d.notify,
+            notifyHolidays = p[K.nHol] ?: d.notifyHolidays,
+            notifyGlobal = p[K.nGlobal] ?: d.notifyGlobal,
+            notifySila = p[K.nSila] ?: d.notifySila,
+            notifyNewYear = p[K.nNy] ?: d.notifyNewYear,
+            notifyMood = p[K.nMood] ?: d.notifyMood,
+            holidayEve = p[K.nEve] ?: d.holidayEve,
         )
     }
 
+    val settings: Flow<Settings> = context.dataStore.data.map { read(it) }
+
     suspend fun update(transform: (Settings) -> Settings) {
         context.dataStore.edit { p ->
-            val cur = Settings(
-                lang = p[K.lang]?.let { runCatching { Lang.valueOf(it) }.getOrNull() } ?: Lang.KM,
-                theme = p[K.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.DARK,
-                birthDate = p[K.birth] ?: 0, lifeYears = p[K.life] ?: 80,
-                weekStartsMonday = p[K.monday] ?: true, showGlobal = p[K.global] ?: true,
-                showObservances = p[K.obs] ?: true, showSila = p[K.sila] ?: true,
-                khmerNumerals = p[K.numerals] ?: true, livingSky = p[K.sky] ?: true, maxLeave = p[K.leave] ?: 3,
-            )
-            val n = transform(cur)
+            val n = transform(read(p))
             p[K.lang] = n.lang.name; p[K.theme] = n.theme.name; p[K.birth] = n.birthDate
             p[K.life] = n.lifeYears; p[K.monday] = n.weekStartsMonday; p[K.global] = n.showGlobal
             p[K.obs] = n.showObservances; p[K.sila] = n.showSila; p[K.numerals] = n.khmerNumerals
             p[K.sky] = n.livingSky; p[K.leave] = n.maxLeave
+            p[K.notify] = n.notify; p[K.nHol] = n.notifyHolidays; p[K.nGlobal] = n.notifyGlobal
+            p[K.nSila] = n.notifySila; p[K.nNy] = n.notifyNewYear; p[K.nMood] = n.notifyMood; p[K.nEve] = n.holidayEve
         }
+    }
+
+    companion object {
+        /** One-shot read for background work (alarms, boot). */
+        suspend fun current(context: Context): Settings = SettingsStore(context).settings.first()
     }
 }
 

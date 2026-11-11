@@ -1,5 +1,26 @@
 package com.pratitin.app.ui.screens.detail
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import com.pratitin.app.data.UserEvent
+import com.pratitin.app.ui.heritage.drawAllCorners
+import com.pratitin.app.ui.screens.events.newEvent
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
@@ -83,18 +104,15 @@ import com.pratitin.khmer.KhmerCalendar
 import com.pratitin.khmer.KhmerNames
 
 /**
- * Day sheet. On open it grows out of the tapped cell ([origin]) — a hand-rolled
- * shared-element transition done purely in graphicsLayer (no relayout per frame).
- * Drag down to dismiss; arrows (or swipe the header) step through days.
+ * Day sheet: a stack of day cards. It grows out of the tapped cell ([origin]) — a hand-rolled
+ * shared-element transition done purely in graphicsLayer — then you flick the top card left
+ * or right and the next/previous day rises from the stack beneath it. Drag the handle down
+ * (or tap outside) to dismiss.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DayDetailSheet(shell: ShellState, date: Int, origin: Rect?, onDismiss: () -> Unit, onNavigate: (Int) -> Unit) {
     val p = LocalPalette.current
     val s = LocalStrings.current
-    val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
-    val moods by shell.vm.moods.collectAsStateWithLifecycle()
-    val today by shell.vm.today.collectAsStateWithLifecycle()
     val reduce = LocalReduceMotion.current
 
     val grow = remember { Animatable(if (reduce || origin == null) 1f else 0f) }
@@ -106,7 +124,7 @@ fun DayDetailSheet(shell: ShellState, date: Int, origin: Rect?, onDismiss: () ->
         Column(
             Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.86f)
+                .fillMaxHeight(0.88f)
                 .onGloballyPositioned { bounds = it.boundsInRoot() }
                 .graphicsLayer {
                     val b = bounds
@@ -125,35 +143,138 @@ fun DayDetailSheet(shell: ShellState, date: Int, origin: Rect?, onDismiss: () ->
                     }
                 }
                 .navigationBarsPadding()
-                .imePadding(),
+                .imePadding()
+                .padding(horizontal = 14.dp),
         ) {
-            GlassCard(shell.content, Modifier.fillMaxSize(), radius = 36.dp, liquid = true, tint = p.night.copy(alpha = if (p.isDark) 0.55f else 0.7f), padding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                // Grab handle: drag down to dismiss (kept off the scrolling body so gestures never fight)
-                Box(
-                    Modifier.fillMaxWidth().height(30.dp).draggable(
-                        rememberDraggableState { delta -> drag = (drag + delta).coerceAtLeast(0f) },
-                        Orientation.Vertical,
-                        onDragStopped = { v ->
-                            if (drag > 140f || v > 1600f) onDismiss()
-                            else animate(drag, 0f, animationSpec = spring(dampingRatio = 0.7f)) { value, _ -> drag = value }
-                        },
-                    ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(Modifier.size(44.dp, 5.dp).clip(Squircles.pill).background(p.inkFaint.copy(alpha = 0.4f)))
-                }
-                AnimatedContent(
-                    targetState = date,
-                    transitionSpec = {
-                        val dir = if (targetState > initialState) 1 else -1
-                        (fadeIn() + slideInHorizontally { it / 4 * dir }) togetherWith (fadeOut() + slideOutHorizontally { -it / 4 * dir })
+            // Grab handle + hint: drag down to dismiss (kept off the cards so gestures never fight)
+            Column(
+                Modifier.fillMaxWidth().draggable(
+                    rememberDraggableState { delta -> drag = (drag + delta).coerceAtLeast(0f) },
+                    Orientation.Vertical,
+                    onDragStopped = { v ->
+                        if (drag > 140f || v > 1600f) onDismiss()
+                        else animate(drag, 0f, animationSpec = spring(dampingRatio = 0.7f)) { value, _ -> drag = value }
                     },
-                    label = "day",
-                ) { d ->
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp)) {
-                        DayContent(shell, d, today, onDismiss, onNavigate, settings, moods[d]?.mood, moods[d]?.note.orEmpty())
-                    }
-                }
+                ).padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(Modifier.size(44.dp, 5.dp).clip(Squircles.pill).background(Color.White.copy(alpha = 0.55f)))
+                Text(s.swipeHint, style = HeritageType.micro, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
+            }
+            CardStack(shell, date, onNavigate, Modifier.weight(1f).fillMaxWidth().padding(bottom = 12.dp))
+        }
+    }
+}
+
+/**
+ * Three-deep card stack. The top card follows the finger with a slight tilt; the card
+ * beneath rises and scales up as you drag; release past ~30 % (or flick) and the top
+ * card flies off while the next one settles into place. All motion is graphicsLayer-only.
+ */
+@Composable
+private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, modifier: Modifier) {
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val offset = remember { Animatable(0f) }
+    var width by remember { mutableFloatStateOf(1f) }
+    // Only flips when the drag direction changes, so dragging doesn't recompose every frame.
+    val forward by remember { derivedStateOf { offset.value <= 0f } }
+    val backDate = if (forward) Day.plusDays(date, 1) else Day.plusDays(date, -1)
+    val deepDate = if (forward) Day.plusDays(date, 2) else Day.plusDays(date, -2)
+    val density = LocalDensity.current
+
+    Box(
+        modifier
+            .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(date) {
+                val tracker = VelocityTracker()
+                detectHorizontalDragGestures(
+                    onDragStart = { tracker.resetTracking() },
+                    onHorizontalDrag = { change, dx ->
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        change.consume()
+                        scope.launch { offset.snapTo(offset.value + dx) }
+                    },
+                    onDragEnd = {
+                        val v = tracker.calculateVelocity().x
+                        scope.launch {
+                            val dir = when {
+                                offset.value < -width * 0.3f || v < -1400f -> 1
+                                offset.value > width * 0.3f || v > 1400f -> -1
+                                else -> 0
+                            }
+                            if (dir == 0) {
+                                offset.animateTo(0f, spring(dampingRatio = 0.62f, stiffness = 420f), initialVelocity = v)
+                            } else {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                offset.animateTo(-dir * width * 1.25f, spring(dampingRatio = 1f, stiffness = 420f), initialVelocity = v)
+                                onNavigate(Day.plusDays(date, dir.toLong()))
+                                offset.snapTo(0f)
+                            }
+                        }
+                    },
+                    onDragCancel = { scope.launch { offset.animateTo(0f, spring(dampingRatio = 0.7f)) } },
+                )
+            },
+    ) {
+        // deepest card: a peek of the day after next, for a sense of depth
+        DayCard(shell, deepDate, preview = true, Modifier.fillMaxSize().graphicsLayer {
+            val k = (abs(offset.value) / (width * 0.6f)).coerceIn(0f, 1f)
+            val sc = 0.88f + 0.06f * k
+            scaleX = sc; scaleY = sc
+            translationY = with(density) { (34.dp - 14.dp * k).toPx() }
+            alpha = 0.55f + 0.3f * k
+        })
+        // the card that will become the top card
+        key(backDate) {
+            DayCard(shell, backDate, preview = false, Modifier.fillMaxSize().graphicsLayer {
+                val k = (abs(offset.value) / (width * 0.6f)).coerceIn(0f, 1f)
+                val sc = 0.94f + 0.06f * k
+                scaleX = sc; scaleY = sc
+                translationY = with(density) { (20.dp * (1f - k)).toPx() }
+                alpha = 0.85f + 0.15f * k
+            })
+        }
+        // top card
+        key(date) {
+            DayCard(shell, date, preview = false, Modifier.fillMaxSize().graphicsLayer {
+                translationX = offset.value
+                translationY = abs(offset.value) * 0.06f
+                rotationZ = offset.value / width * 9f
+                transformOrigin = TransformOrigin(0.5f, 1.2f)
+            })
+        }
+    }
+}
+
+/** A solid "physical" day card — lacquer surface, gilded rim and kbach corners. */
+@Composable
+private fun DayCard(shell: ShellState, d: Int, preview: Boolean, modifier: Modifier) {
+    val p = LocalPalette.current
+    val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
+    val moods by shell.vm.moods.collectAsStateWithLifecycle()
+    val events by shell.vm.events.collectAsStateWithLifecycle()
+    val today by shell.vm.today.collectAsStateWithLifecycle()
+    val surface = if (p.isDark) Brush.verticalGradient(listOf(Color(0xFF231629), Color(0xFF140C1B)))
+    else Brush.verticalGradient(listOf(Color(0xFFFFFAF1), Color(0xFFF3E4CC)))
+    Box(
+        modifier
+            .shadow(18.dp, Squircles.xl, ambientColor = Color.Black, spotColor = Color.Black)
+            .clip(Squircles.xl)
+            .background(surface)
+            .border(1.dp, p.gold.copy(alpha = 0.45f), Squircles.xl)
+            .drawBehind { drawAllCorners(p.gold.copy(alpha = 0.35f), 20.dp.toPx()) },
+    ) {
+        if (preview) {
+            val k = remember(d) { khmerOf(d) }
+            val s = LocalStrings.current
+            Column(Modifier.padding(22.dp)) {
+                Text(s.num(Day.dom(d)), style = HeritageType.number, color = p.ink.copy(alpha = 0.5f))
+                Text(lunarLine(k, s), style = HeritageType.title, color = p.inkSoft)
+            }
+        } else {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp)) {
+                DayContent(shell, d, today, settings, moods[d]?.mood, moods[d]?.note.orEmpty(), events.filter { it.occursOn(d) }.sortedWith(compareBy({ !it.allDay }, { it.startMin })))
             }
         }
     }
@@ -162,8 +283,9 @@ fun DayDetailSheet(shell: ShellState, date: Int, origin: Rect?, onDismiss: () ->
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DayContent(
-    shell: ShellState, d: Int, today: Int, onDismiss: () -> Unit, onNavigate: (Int) -> Unit,
+    shell: ShellState, d: Int, today: Int,
     settings: com.pratitin.app.data.Settings, mood: com.pratitin.app.data.Mood?, note: String,
+    dayEvents: List<UserEvent>,
 ) {
     val p = LocalPalette.current
     val s = LocalStrings.current
@@ -175,7 +297,6 @@ private fun DayContent(
     val diff = Day.between(today, d).toInt()
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        GlassIconButton(shell.content, onClick = { onNavigate(Day.plusDays(d, -1)) }, size = 38.dp, icon = Icons.chevronLeft)
         Column(Modifier.weight(1f).padding(horizontal = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(s.num(Day.dom(d)), style = HeritageType.number, color = if (hol.isNotEmpty()) holidayColor(hol.first(), p) else p.ink)
             Text(gregorianLong(d, s), style = HeritageType.label, color = p.inkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -184,7 +305,6 @@ private fun DayContent(
                 style = HeritageType.micro, color = p.gold,
             )
         }
-        GlassIconButton(shell.content, onClick = { onNavigate(Day.plusDays(d, 1)) }, size = 38.dp, icon = Icons.chevronRight)
     }
     Spacer(Modifier.height(16.dp))
     KbachDivider(height = 12.dp, alpha = 0.6f)
@@ -213,7 +333,7 @@ private fun DayContent(
     if (isSongkran) {
         Spacer(Modifier.height(14.dp))
         val time = "%02d:%02d".format(ny.hour, ny.minute)
-        GlassCard(shell.bg, Modifier.fillMaxWidth(), tint = p.lacquer.copy(alpha = 0.25f)) {
+        TintCard(p.lacquer.copy(alpha = 0.25f), Modifier.fillMaxWidth()) {
             Text("🎉 ${s.songkranAt} ${if (s.lang == Lang.KM) KhmerNames.digits(time) else time}", style = HeritageType.heading, color = p.goldSoft)
         }
     }
@@ -221,7 +341,7 @@ private fun DayContent(
     if (hol.isNotEmpty()) {
         Spacer(Modifier.height(14.dp))
         hol.forEach { h ->
-            GlassCard(shell.bg, Modifier.fillMaxWidth().padding(vertical = 4.dp), tint = holidayColor(h, p).copy(alpha = 0.14f)) {
+            TintCard(holidayColor(h, p).copy(alpha = 0.14f), Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text("${h.emoji} ${h.title(s)}", style = HeritageType.heading, color = p.ink)
                 Text(if (s.lang == Lang.KM) h.nameEn else h.nameKm, style = HeritageType.micro, color = p.inkSoft)
                 Spacer(Modifier.height(6.dp))
@@ -232,6 +352,20 @@ private fun DayContent(
             }
         }
     }
+
+    // ---- events & notes
+    Spacer(Modifier.height(18.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(s.events, style = HeritageType.heading, color = p.ink, modifier = Modifier.weight(1f))
+        Row(
+            Modifier.clip(Squircles.pill).background(p.gold).clickable { shell.editEvent(newEvent(d), true) }
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { Text("+ ${s.addEvent}", style = HeritageType.label, color = p.night) }
+    }
+    Spacer(Modifier.height(8.dp))
+    if (dayEvents.isEmpty()) Text(s.noEvents, style = HeritageType.micro, color = p.inkSoft)
+    dayEvents.forEach { ev -> EventRow(ev, onClick = { shell.editEvent(ev, false) }) }
 
     Spacer(Modifier.height(18.dp))
     MoodPicker(mood, onPick = { shell.vm.setMood(d, it, note) })
@@ -258,4 +392,34 @@ private fun NoteField(value: String, enabled: Boolean, onChange: (String) -> Uni
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+@Composable
+fun EventRow(ev: UserEvent, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    val s = LocalStrings.current
+    Row(
+        modifier.fillMaxWidth().padding(vertical = 3.dp).clip(Squircles.m).background(ev.colorValue.copy(alpha = 0.14f))
+            .clickable(onClick = onClick).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(4.dp, 34.dp).clip(Squircles.pill).background(ev.colorValue))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text("${ev.kind.emoji} ${ev.title.ifBlank { if (s.lang == Lang.KM) ev.kind.km else ev.kind.en }}", style = HeritageType.body, color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val sub = buildList {
+                if (!ev.allDay) add(ev.timeLabel().let { if (s.khmerDigits) KhmerNames.digits(it) else it })
+                if (ev.repeat != com.pratitin.khmer.Repeat.NONE) add("↻ " + s.repeatNames[ev.repeat.ordinal])
+                if (ev.remind != com.pratitin.app.data.Remind.NONE) add("🔔")
+                if (ev.note.isNotBlank()) add(ev.note.lineSequence().first().take(40))
+            }.joinToString(" · ")
+            if (sub.isNotEmpty()) Text(sub, style = HeritageType.micro, color = p.inkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Flat tinted panel for use on the solid day cards (glass would show the sky through). */
+@Composable
+private fun TintCard(tint: Color, modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(modifier.clip(Squircles.m).background(tint).padding(14.dp), content = content)
 }

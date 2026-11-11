@@ -61,4 +61,19 @@ class KhmerCalendarTest {
         val s = LeavePlanner.suggest(2026)
         assertTrue(s.any { it.startPacked <= 20260414 && it.endPacked >= 20260419 })
     }
+
+    @Test fun lunarYearlyRepeatFollowsTheMoon() {
+        // Pchum Ben 2025 (15 Roch Phatrabot) repeats on the official 2026 & 2027 dates
+        assertEquals(20261011, Recurrence.nextOccurrence(20250922, Repeat.LUNAR_YEARLY, 20251001))
+        assertEquals(20270930, Recurrence.nextOccurrence(20250922, Repeat.LUNAR_YEARLY, 20261012))
+        // Visak Bochea 2025 → 2026 (1 May)
+        assertEquals(20260501, Recurrence.nextOccurrence(20250511, Repeat.LUNAR_YEARLY, 20250601))
+    }
+
+    @Test fun gregorianRepeats() {
+        assertEquals(20270131, Recurrence.nextOccurrence(20260131, Repeat.YEARLY, 20260201))
+        assertEquals(20260228, Recurrence.nextOccurrence(20260131, Repeat.MONTHLY, 20260201))
+        assertEquals(20261119, Recurrence.nextOccurrence(20261112, Repeat.WEEKLY, 20261113))
+        assertEquals(0, Recurrence.nextOccurrence(20261112, Repeat.NONE, 20261113))
+    }
 }

@@ -39,4 +39,13 @@ data class Settings(
     val khmerNumerals: Boolean = true,
     val livingSky: Boolean = true,
     val maxLeave: Int = 3,
+    // ---- reminders
+    val notify: Boolean = false,
+    val notifyHolidays: Boolean = true,
+    val notifyGlobal: Boolean = false,
+    val notifySila: Boolean = false,
+    val notifyNewYear: Boolean = true,
+    val notifyMood: Boolean = false,
+    /** true = evening before (19:00), false = morning of (07:00) */
+    val holidayEve: Boolean = true,
 )
