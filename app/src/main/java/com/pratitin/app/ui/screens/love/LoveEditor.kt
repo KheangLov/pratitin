@@ -119,7 +119,7 @@ fun AnniversaryEditorSheet(shell: ShellState, initial: Anniversary, isNew: Boole
             colors = DatePickerDefaults.colors(containerColor = p.nightDeep),
         ) {
             DatePicker(
-                st, showModeToggle = true,
+                st, showModeToggle = false, // typed input crashes on some locales (e.g. Khmer); tap the month/year header to jump years
                 colors = DatePickerDefaults.colors(containerColor = p.nightDeep, selectedDayContainerColor = lp.rose, todayDateBorderColor = lp.rose, selectedYearContainerColor = lp.rose),
             )
         }
