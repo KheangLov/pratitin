@@ -127,7 +127,7 @@ fun EventEditorSheet(shell: ShellState, initial: UserEvent, isNew: Boolean, onDi
         GlassCard(
             shell.content,
             Modifier.fillMaxWidth().graphicsLayer { translationY = rise.value * size.height }.navigationBarsPadding().imePadding(),
-            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.62f else 0.78f),
+            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.93f else 0.95f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (isNew) s.addEvent else s.editEvent, style = HeritageType.title, color = p.ink, modifier = Modifier.weight(1f))

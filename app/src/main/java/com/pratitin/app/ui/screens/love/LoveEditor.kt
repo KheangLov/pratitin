@@ -129,7 +129,7 @@ fun AnniversaryEditorSheet(shell: ShellState, initial: Anniversary, isNew: Boole
         GlassCard(
             shell.content,
             Modifier.fillMaxWidth().graphicsLayer { translationY = rise.value * size.height }.navigationBarsPadding().imePadding(),
-            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.66f else 0.8f),
+            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.93f else 0.95f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -298,7 +298,7 @@ fun LoveProfileSheet(shell: ShellState, onDismiss: () -> Unit) {
         GlassCard(
             shell.content,
             Modifier.fillMaxWidth().graphicsLayer { translationY = rise.value * size.height }.navigationBarsPadding().imePadding(),
-            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.66f else 0.8f),
+            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.93f else 0.95f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (km) "💞 យើងទាំងពីរ" else "💞 The two of us", style = HeritageType.title, color = p.ink, modifier = Modifier.weight(1f))
