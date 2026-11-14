@@ -9,7 +9,7 @@ import com.pratitin.khmer.KhmerNames
 @Immutable
 data class Strings(
     val lang: Lang,
-    val tabToday: String, val tabCalendar: String, val tabHolidays: String, val tabMood: String, val tabLife: String,
+    val tabToday: String, val tabCalendar: String, val tabHolidays: String, val tabMood: String, val tabLife: String, val tabLove: String,
     val today: String, val lunarDate: String, val nextHoliday: String, val inDays: (Int) -> String, val todayIsHoliday: String,
     val silaDay: String, val fullMoon: String, val newMoon: String, val waxing: String, val waning: String,
     val yearOf: String, val beYear: String, val jsYear: String,
@@ -42,7 +42,7 @@ private val EN_MONTHS = listOf("January", "February", "March", "April", "May", "
 
 val KhmerStrings = Strings(
     lang = Lang.KM,
-    tabToday = "ថ្ងៃនេះ", tabCalendar = "ប្រតិទិន", tabHolidays = "បុណ្យ", tabMood = "អារម្មណ៍", tabLife = "ជីវិត",
+    tabToday = "ថ្ងៃនេះ", tabCalendar = "ប្រតិទិន", tabHolidays = "បុណ្យ", tabMood = "អារម្មណ៍", tabLife = "ជីវិត", tabLove = "ស្នេហា",
     today = "ថ្ងៃនេះ", lunarDate = "ចន្ទគតិ", nextHoliday = "ថ្ងៃបុណ្យបន្ទាប់",
     inDays = { if (it == 0) "ថ្ងៃនេះ" else if (it == 1) "ថ្ងៃស្អែក" else "${KhmerNames.digits(it)} ថ្ងៃទៀត" },
     todayIsHoliday = "ថ្ងៃនេះជាថ្ងៃបុណ្យ",
@@ -76,7 +76,7 @@ val KhmerStrings = Strings(
 
 val EnglishStrings = Strings(
     lang = Lang.EN,
-    tabToday = "Today", tabCalendar = "Calendar", tabHolidays = "Holidays", tabMood = "Mood", tabLife = "Life",
+    tabToday = "Today", tabCalendar = "Calendar", tabHolidays = "Holidays", tabMood = "Mood", tabLife = "Life", tabLove = "Love",
     today = "Today", lunarDate = "Lunar date", nextHoliday = "Next holiday",
     inDays = { if (it == 0) "Today" else if (it == 1) "Tomorrow" else "in $it days" },
     todayIsHoliday = "Today is a holiday",

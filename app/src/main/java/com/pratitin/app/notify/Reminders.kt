@@ -9,6 +9,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -17,7 +19,11 @@ import com.pratitin.app.MainActivity
 import com.pratitin.app.R
 import com.pratitin.app.data.EventKind
 import com.pratitin.app.data.EventStore
+import com.pratitin.app.data.AnnivKind
 import com.pratitin.app.data.Lang
+import com.pratitin.app.data.LoveData
+import com.pratitin.app.data.LoveMath
+import com.pratitin.app.data.LoveStore
 import com.pratitin.app.data.Remind
 import com.pratitin.app.data.Settings
 import com.pratitin.app.data.SettingsStore
@@ -48,13 +54,15 @@ object Reminders {
     const val CH_EVENT = "events"
     const val CH_BUDDHIST = "buddhist"
     const val CH_MOOD = "mood"
+    const val CH_LOVE = "love"
     const val EXTRA_DATE = "open_date"
+    const val EXTRA_TAB = "open_tab"
     private const val MAX_ALARMS = 48
     private const val WINDOW_DAYS = 60L
     private const val PREFS = "reminders"
     private const val KEY_IDS = "armed_ids"
 
-    data class Planned(val id: Int, val at: Long, val title: String, val text: String, val channel: String, val date: Int)
+    data class Planned(val id: Int, val at: Long, val title: String, val text: String, val channel: String, val date: Int, val tab: String? = null)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -68,6 +76,17 @@ object Reminders {
             ch(CH_EVENT, "Your events & birthdays", "ព្រឹត្តិការណ៍ និងខួបកំណើត", NotificationManager.IMPORTANCE_HIGH),
             ch(CH_BUDDHIST, "Sila & Buddhist days", "ថ្ងៃសីល និងពិធីបុណ្យ", NotificationManager.IMPORTANCE_LOW),
             ch(CH_MOOD, "Daily mood check-in", "កត់ត្រាអារម្មណ៍ប្រចាំថ្ងៃ", NotificationManager.IMPORTANCE_LOW),
+            ch(CH_LOVE, "Anniversaries & love", "ខួបស្នេហា", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = if (km) "ខួបអាពាហ៍ពិពាហ៍ ខួបស្នេហា និងថ្ងៃពិសេសរបស់យើង" else "Wedding & love anniversaries, milestones and monthiversaries"
+                setSound(
+                    Uri.parse("android.resource://${ctx.packageName}/${R.raw.love_chime}"),
+                    AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build(),
+                )
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 120, 160, 120) // a heartbeat
+                enableLights(true)
+                lightColor = 0xFFEE8FB0.toInt()
+            },
         ))
     }
 
@@ -80,6 +99,7 @@ object Reminders {
     suspend fun reschedule(ctx: Context) {
         val settings = SettingsStore.current(ctx)
         val events = EventStore.readBlocking(ctx)
+        val love = LoveStore.readBlocking(ctx)
         val am = ctx.getSystemService(AlarmManager::class.java) ?: return
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         // cancel what we armed last time
@@ -88,15 +108,14 @@ object Reminders {
             PendingIntent.getBroadcast(ctx, id, Intent(ctx, ReminderReceiver::class.java), PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
                 ?.let { am.cancel(it); it.cancel() }
         }
-        if (!settings.notify) { prefs.edit().putStringSet(KEY_IDS, emptySet()).apply(); return }
-
         val now = System.currentTimeMillis()
-        val plan = plan(settings, events, LocalDateTime.now()).filter { it.at > now + 5_000 }.sortedBy { it.at }.take(MAX_ALARMS)
+        val plan = plan(settings, events, LocalDateTime.now(), love).filter { it.at > now + 5_000 }.sortedBy { it.at }.take(MAX_ALARMS)
         val exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
         plan.forEach { r ->
             val intent = Intent(ctx, ReminderReceiver::class.java).apply {
                 putExtra("title", r.title); putExtra("text", r.text); putExtra("channel", r.channel)
                 putExtra("id", r.id); putExtra(EXTRA_DATE, r.date)
+                if (r.tab != null) putExtra(EXTRA_TAB, r.tab)
             }
             val pi = PendingIntent.getBroadcast(ctx, r.id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, r.at, pi)
@@ -106,7 +125,7 @@ object Reminders {
     }
 
     /** Pure planning: everything that should notify in the next window. */
-    fun plan(s: Settings, events: List<UserEvent>, now: LocalDateTime): List<Planned> {
+    fun plan(s: Settings, events: List<UserEvent>, now: LocalDateTime, love: LoveData = LoveData()): List<Planned> {
         val km = s.lang == Lang.KM
         val zone = ZoneId.systemDefault()
         val out = ArrayList<Planned>()
@@ -118,6 +137,10 @@ object Reminders {
             return if (km) KhmerNames.digits("${k.day}") + "${KhmerNames.PHASE[k.phase.ordinal]} ខែ${KhmerNames.LUNAR_MONTHS[k.monthIndex]}"
             else "${k.day} ${if (k.dayNumber < 15) "Kaet" else "Roch"} · ${KhmerNames.LUNAR_MONTHS_LATIN[k.monthIndex]}"
         }
+
+        // ---- anniversaries (independent of the main reminders switch: set per anniversary)
+        planLove(love, km, today, ::millis, ::pk, out)
+        if (!s.notify) return out
 
         // ---- holidays (first day of each festival only)
         val seen = HashSet<String>()
@@ -208,27 +231,127 @@ object Reminders {
         return out
     }
 
+    private fun planLove(
+        love: LoveData, km: Boolean, today: LocalDate,
+        millis: (LocalDate, Int, Int) -> Long, pk: (LocalDate) -> Int, out: MutableList<Planned>,
+    ) {
+        if (love.items.none { it.remind }) return
+        fun n(v: Long) = LoveMath.fmt(v, km)
+        val couple = love.couple(km)
+        val partner = love.profile.partner.ifBlank { if (km) "អូន" else "your love" }
+        val featuredId = love.featured?.id
+        for (a in love.items) {
+            if (!a.remind) continue
+            val icon = a.kind.emoji
+            for (i in 0..WINDOW_DAYS) {
+                val d = today.plusDays(i)
+                val p = pk(d)
+                if (p < a.date) continue
+                val e = LoveMath.elapsed(a.date, p)
+                val togetherLine = if (km) "${n(e.days)} ថ្ងៃ · ${n(e.weeks)} សប្ដាហ៍ · ${n(e.totalMonths)} ខែ ជាមួយគ្នា"
+                    else "${n(e.days)} days · ${n(e.weeks)} weeks · ${n(e.totalMonths)} months together"
+
+                // the day itself (or the big day, if it's the original date)
+                if (LoveMath.occursOn(a, p)) {
+                    val num = LoveMath.number(a, p)
+                    val (title, text) = when {
+                        num == 0 -> (if (km) "$icon ថ្ងៃនេះហើយ! ${a.name(true)}" else "$icon Today's the day — ${a.name(false)}") to
+                            (if (km) "ថ្ងៃដ៏ពិសេសរបស់ $couple 💗" else "A special day for $couple 💗")
+                        a.kind == AnnivKind.PARTNER_BIRTHDAY -> (if (km) "🎂 រីករាយថ្ងៃកំណើត $partner!" else "🎂 Happy birthday, $partner!") to
+                            (if (km) "អាយុ ${n(num.toLong())} ឆ្នាំហើយ · កុំភ្លេចឱបនាងឲ្យណែនៗ 💝" else "Turning $num today — hug her tight 💝")
+                        else -> {
+                            val gift = if (a.kind == AnnivKind.WEDDING) LoveMath.gift(num) else null
+                            (if (km) "$icon រីករាយ${a.annName(true)} លើកទី ${n(num.toLong())}!" else "$icon Happy ${LoveMath.ordinalEn(num)} ${a.annName(false)}!") to
+                                (togetherLine + (gift?.let { g -> if (km) "\nអំណោយប្រពៃណី៖ ${g.third} ${g.first}" else "\nTraditional gift: ${g.third} ${g.second}" } ?: "") +
+                                    (if (km) "\n$couple 💞" else "\n$couple 💞"))
+                        }
+                    }
+                    out += Planned(id("love", a.id.toString(), p), millis(d, 8, 0), title, text, CH_LOVE, p, "love")
+                    // the days-before nudge
+                    if (a.daysBefore > 0) {
+                        val pre = d.minusDays(a.daysBefore.toLong())
+                        if (!pre.isBefore(today)) {
+                            val whenTxt = when (a.daysBefore) {
+                                1 -> if (km) "ស្អែក" else "tomorrow"
+                                7 -> if (km) "មួយសប្ដាហ៍ទៀត" else "in a week"
+                                else -> if (km) "${n(a.daysBefore.toLong())} ថ្ងៃទៀត" else "in ${a.daysBefore} days"
+                            }
+                            val what = when {
+                                num == 0 -> a.name(km)
+                                a.kind == AnnivKind.PARTNER_BIRTHDAY -> if (km) "ថ្ងៃកំណើត $partner" else "$partner's birthday"
+                                km -> "${a.annName(true)} លើកទី ${n(num.toLong())}"
+                                else -> "${LoveMath.ordinalEn(num)} ${a.annName(false)}"
+                            }
+                            out += Planned(
+                                id("love-pre", a.id.toString(), p), millis(pre, 19, 0),
+                                if (km) "$icon $what $whenTxt" else "$icon $what is $whenTxt",
+                                if (km) "រៀបចំអ្វីពិសេសសម្រាប់ $partner 🌹 កាដូ ផ្កា ឬអាហារពេលល្ងាច…" else "Plan something special for $partner 🌹 flowers, a gift, a dinner…",
+                                CH_LOVE, p, "love",
+                            )
+                        }
+                    }
+                }
+
+                // milestones (days, weeks, hours, minutes)
+                if (a.milestones && a.kind != AnnivKind.PARTNER_BIRTHDAY && (a.id == featuredId || a.kind == AnnivKind.WEDDING)) {
+                    for (ms in LoveMath.milestonesOn(a.date, p)) {
+                        val unit = when (ms.unit) {
+                            LoveMath.MUnit.DAYS -> if (km) "ថ្ងៃ" else "days"
+                            LoveMath.MUnit.WEEKS -> if (km) "សប្ដាហ៍" else "weeks"
+                            LoveMath.MUnit.HOURS -> if (km) "ម៉ោង" else "hours"
+                            LoveMath.MUnit.MINUTES -> if (km) "នាទី" else "minutes"
+                        }
+                        out += Planned(
+                            id("love-ms", "${a.id}-${ms.unit}-${ms.value}", p), millis(d, 9, 0),
+                            if (km) "🎉 ${n(ms.value)} $unit ជាមួយគ្នា!" else "🎉 ${n(ms.value)} $unit together!",
+                            if (km) "តាំងពី${a.name(true)} · $couple 💞" else "Since ${a.name(false).replaceFirstChar { it.lowercase() }} · $couple 💞",
+                            CH_LOVE, p, "love",
+                        )
+                    }
+                }
+
+                // monthiversary
+                if (a.monthly && a.kind != AnnivKind.PARTNER_BIRTHDAY && LoveMath.isMonthiversary(a, p)) {
+                    val ym = if (km) buildString {
+                        if (e.years > 0) append("${n(e.years.toLong())} ឆ្នាំ ")
+                        append("${n(e.months.toLong())} ខែ")
+                    } else buildString {
+                        if (e.years > 0) append("${e.years} year${if (e.years > 1) "s" else ""} ")
+                        append("${e.months} month${if (e.months != 1) "s" else ""}")
+                    }
+                    out += Planned(
+                        id("love-mo", a.id.toString(), p), millis(d, 8, 30),
+                        if (km) "💗 $ym ហើយ!" else "💗 $ym today!",
+                        if (km) "${a.name(true)} · ${n(e.days)} ថ្ងៃជាមួយគ្នា" else "${a.name(false)} · ${n(e.days)} days together",
+                        CH_LOVE, p, "love",
+                    )
+                }
+            }
+        }
+    }
+
     private fun id(kind: String, key: String, date: Int) = ("$kind|$key|$date").hashCode()
 
     fun canPost(ctx: Context) = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun show(ctx: Context, id: Int, title: String, text: String, channel: String, date: Int) {
+    fun show(ctx: Context, id: Int, title: String, text: String, channel: String, date: Int, tab: String? = null) {
         if (!canPost(ctx)) return
         val open = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(EXTRA_DATE, date)
+            if (tab != null) putExtra(EXTRA_TAB, tab)
         }
         val pi = PendingIntent.getActivity(ctx, id, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_stat_lotus)
-            .setColor(0xFFE8B653.toInt())
+            .setColor(if (channel == CH_LOVE) 0xFFEE8FB0.toInt() else 0xFFE8B653.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(pi)
             .setAutoCancel(true)
-            .setCategory(if (channel == CH_EVENT) NotificationCompat.CATEGORY_EVENT else NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(if (channel == CH_EVENT || channel == CH_LOVE) NotificationCompat.CATEGORY_EVENT else NotificationCompat.CATEGORY_REMINDER)
             .build()
         try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (_: SecurityException) { }
     }
@@ -244,6 +367,7 @@ class ReminderReceiver : BroadcastReceiver() {
             intent.getStringExtra("text").orEmpty(),
             intent.getStringExtra("channel") ?: Reminders.CH_EVENT,
             intent.getIntExtra(Reminders.EXTRA_DATE, 0),
+            intent.getStringExtra(Reminders.EXTRA_TAB),
         )
         val pending = goAsync()
         CoroutineScope(Dispatchers.Default).launch {

@@ -136,7 +136,7 @@ fun EventEditorSheet(shell: ShellState, initial: UserEvent, isNew: Boolean, onDi
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 // kind
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
-                    EventKind.entries.forEach { k ->
+                    EventKind.entries.filter { it != EventKind.ANNIVERSARY }.forEach { k ->
                         GlassChip(if (s.lang == Lang.KM) k.km else k.en, e.kind == k, shell.content, leading = k.emoji) {
                             e = e.copy(
                                 kind = k,

@@ -33,6 +33,7 @@ jobs:
           name: pratitin-apk
           path: dist/*.apk
       - name: Publish release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
@@ -40,6 +41,7 @@ jobs:
           make_latest: true
           files: dist/*.apk
       - name: Push APK to apk branch
+        if: github.ref == 'refs/heads/main'
         run: |
           cd dist
           git init -q -b apk

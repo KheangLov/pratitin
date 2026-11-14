@@ -268,9 +268,58 @@ object Icons {
     val fullMoon: DrawScope.(Color) -> Unit = { c -> drawCircle(c, size.minDimension / 2) }
     val newMoon: DrawScope.(Color) -> Unit = { c -> drawCircle(c, size.minDimension / 2 - 0.7.dp.toPx(), style = Stroke(1.3.dp.toPx())) }
     val leap: DrawScope.(Color) -> Unit = { c -> drawLotus(Offset(center.x, size.height * 0.95f), size.height * 0.95f, 0.9f, c, c) }
+    val heart: DrawScope.(Color) -> Unit = { c ->
+        drawPath(heartPath(Offset(0f, size.height * 0.04f), size.width), c, style = sw())
+    }
+    val heartFilled: DrawScope.(Color) -> Unit = { c -> drawPath(heartPath(Offset(0f, size.height * 0.04f), size.width), c) }
+    val bell: DrawScope.(Color) -> Unit = { c ->
+        val w = size.width; val h = size.height
+        val body = Path().apply {
+            moveTo(w * 0.18f, h * 0.74f); quadraticTo(w * 0.24f, h * 0.62f, w * 0.24f, h * 0.45f)
+            cubicTo(w * 0.24f, h * 0.18f, w * 0.76f, h * 0.18f, w * 0.76f, h * 0.45f)
+            quadraticTo(w * 0.76f, h * 0.62f, w * 0.82f, h * 0.74f); close()
+        }
+        drawPath(body, c, style = sw())
+        drawCircle(c, w * 0.08f, Offset(w * 0.5f, h * 0.86f))
+    }
+    val speaker: DrawScope.(Color) -> Unit = { c ->
+        val w = size.width; val h = size.height
+        val p = Path().apply { moveTo(w * 0.1f, h * 0.38f); lineTo(w * 0.3f, h * 0.38f); lineTo(w * 0.55f, h * 0.15f); lineTo(w * 0.55f, h * 0.85f); lineTo(w * 0.3f, h * 0.62f); lineTo(w * 0.1f, h * 0.62f); close() }
+        drawPath(p, c)
+        drawArc(c, -45f, 90f, false, Offset(w * 0.45f, h * 0.3f), Size(w * 0.35f, h * 0.4f), style = sw())
+        drawArc(c, -50f, 100f, false, Offset(w * 0.4f, h * 0.12f), Size(w * 0.58f, h * 0.76f), style = sw())
+    }
+    val mute: DrawScope.(Color) -> Unit = { c ->
+        val w = size.width; val h = size.height
+        val p = Path().apply { moveTo(w * 0.1f, h * 0.38f); lineTo(w * 0.3f, h * 0.38f); lineTo(w * 0.55f, h * 0.15f); lineTo(w * 0.55f, h * 0.85f); lineTo(w * 0.3f, h * 0.62f); lineTo(w * 0.1f, h * 0.62f); close() }
+        drawPath(p, c)
+        drawLine(c, Offset(w * 0.68f, h * 0.36f), Offset(w * 0.94f, h * 0.64f), 1.8.dp.toPx(), StrokeCap.Round)
+        drawLine(c, Offset(w * 0.94f, h * 0.36f), Offset(w * 0.68f, h * 0.64f), 1.8.dp.toPx(), StrokeCap.Round)
+    }
+    val plus: DrawScope.(Color) -> Unit = { c ->
+        drawLine(c, Offset(size.width * 0.5f, size.height * 0.15f), Offset(size.width * 0.5f, size.height * 0.85f), 2.2.dp.toPx(), StrokeCap.Round)
+        drawLine(c, Offset(size.width * 0.15f, size.height * 0.5f), Offset(size.width * 0.85f, size.height * 0.5f), 2.2.dp.toPx(), StrokeCap.Round)
+    }
     val target: DrawScope.(Color) -> Unit = { c ->
         drawCircle(c, size.minDimension * 0.42f, style = sw()); drawCircle(c, size.minDimension * 0.16f)
     }
+}
+
+/**
+ * A heart in a [width]-wide box whose top-left is [topLeft]; height ≈ 0.9 × width.
+ * Shared by the tab icon and the Love tab's effects.
+ */
+fun heartPath(topLeft: Offset, width: Float, path: Path = Path()): Path {
+    val w = width; val h = width * 0.9f
+    val x = topLeft.x; val y = topLeft.y
+    path.reset()
+    path.moveTo(x + w * 0.5f, y + h * 0.98f)
+    path.cubicTo(x + w * 0.12f, y + h * 0.72f, x - w * 0.02f, y + h * 0.42f, x + w * 0.08f, y + h * 0.2f)
+    path.cubicTo(x + w * 0.2f, y - h * 0.02f, x + w * 0.44f, y + h * 0.0f, x + w * 0.5f, y + h * 0.22f)
+    path.cubicTo(x + w * 0.56f, y + h * 0.0f, x + w * 0.8f, y - h * 0.02f, x + w * 0.92f, y + h * 0.2f)
+    path.cubicTo(x + w * 1.02f, y + h * 0.42f, x + w * 0.88f, y + h * 0.72f, x + w * 0.5f, y + h * 0.98f)
+    path.close()
+    return path
 }
 
 /** Small helper to render an icon lambda at a size. */

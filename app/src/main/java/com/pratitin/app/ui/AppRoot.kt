@@ -73,6 +73,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pratitin.app.AppViewModel
+import com.pratitin.app.data.Anniversary
+import com.pratitin.app.data.EventKind
 import com.pratitin.app.data.Lang
 import com.pratitin.app.data.UserEvent
 import com.pratitin.app.ui.screens.events.EventEditorSheet
@@ -91,6 +93,9 @@ import com.pratitin.app.ui.screens.calendar.CalendarScreen
 import com.pratitin.app.ui.screens.detail.DayDetailSheet
 import com.pratitin.app.ui.screens.holidays.HolidaysScreen
 import com.pratitin.app.ui.screens.life.LifeScreen
+import com.pratitin.app.ui.screens.love.AnniversaryEditorSheet
+import com.pratitin.app.ui.screens.love.LoveProfileSheet
+import com.pratitin.app.ui.screens.love.LoveScreen
 import com.pratitin.app.ui.screens.mood.MoodScreen
 import com.pratitin.app.ui.screens.settings.SettingsSheet
 import com.pratitin.app.ui.screens.today.TodayScreen
@@ -99,7 +104,7 @@ import com.pratitin.app.ui.theme.HeritageType
 import com.pratitin.app.ui.theme.LocalPalette
 import com.pratitin.app.ui.theme.PratitinTheme
 
-enum class Tab { TODAY, CALENDAR, HOLIDAYS, MOOD, LIFE }
+enum class Tab { TODAY, CALENDAR, HOLIDAYS, MOOD, LOVE, LIFE }
 
 /** Everything a screen needs from the shell, bundled so signatures stay small. */
 class ShellState(
@@ -111,6 +116,8 @@ class ShellState(
     val goTo: (Tab) -> Unit,
     val reportScroll: (Float) -> Unit,
     val editEvent: (UserEvent, Boolean) -> Unit,
+    val openLoveEditor: (Anniversary, Boolean) -> Unit,
+    val openLoveProfile: () -> Unit,
 )
 
 @Composable
@@ -145,6 +152,8 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
     var detailOrigin by remember { mutableStateOf<Rect?>(null) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Pair<UserEvent, Boolean>?>(null) }
+    var loveEditing by remember { mutableStateOf<Pair<Anniversary, Boolean>?>(null) }
+    var loveProfileOpen by rememberSaveable { mutableStateOf(false) }
     val scroll = remember { mutableFloatStateOf(0f) }
     val holder = rememberSaveableStateHolder()
 
@@ -155,7 +164,16 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
             openSettings = { settingsOpen = true },
             goTo = { tab = it },
             reportScroll = { scroll.floatValue = it },
-            editEvent = { e, isNew -> editing = e to isNew },
+            editEvent = { e, isNew ->
+                if (e.kind == EventKind.ANNIVERSARY) {
+                    // anniversaries live in the Love tab
+                    val a = vm.love.value.items.firstOrNull { it.id == -e.id }
+                    detailOpen = false; tab = Tab.LOVE
+                    if (a != null) loveEditing = a to false
+                } else editing = e to isNew
+            },
+            openLoveEditor = { a, isNew -> loveEditing = a to isNew },
+            openLoveProfile = { loveProfileOpen = true },
         )
     }
 
@@ -168,8 +186,17 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         }
     }
 
-    BackHandler(enabled = editing != null || detailOpen || settingsOpen || tab != Tab.TODAY) {
+    // Notification tap → open a tab (anniversary reminders open Love).
+    val pendingTab by vm.pendingTab.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingTab) {
+        if (pendingTab == "love") { detailOpen = false; settingsOpen = false; tab = Tab.LOVE }
+        if (pendingTab != null) vm.pendingTab.value = null
+    }
+
+    BackHandler(enabled = loveEditing != null || loveProfileOpen || editing != null || detailOpen || settingsOpen || tab != Tab.TODAY) {
         when {
+            loveEditing != null -> loveEditing = null
+            loveProfileOpen -> loveProfileOpen = false
             editing != null -> editing = null
             detailOpen -> detailOpen = false
             settingsOpen -> settingsOpen = false
@@ -205,6 +232,7 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
                         Tab.CALENDAR -> CalendarScreen(shell)
                         Tab.HOLIDAYS -> HolidaysScreen(shell)
                         Tab.MOOD -> MoodScreen(shell)
+                        Tab.LOVE -> LoveScreen(shell)
                         Tab.LIFE -> LifeScreen(shell)
                     }
                 }
@@ -250,6 +278,20 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
             if (ed != null) keep[0] = ed
             keep[0]?.let { (e, isNew) -> EventEditorSheet(shell, e, isNew, onDismiss = { editing = null }) }
         }
+        // Love tab sheets
+        val le = loveEditing
+        if (le != null || loveProfileOpen) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f))
+                .clickable(remember { MutableInteractionSource() }, null) { loveEditing = null; loveProfileOpen = false })
+        }
+        AnimatedVisibility(visible = le != null, enter = fadeIn(), exit = fadeOut()) {
+            val keep = remember { arrayOfNulls<Pair<Anniversary, Boolean>>(1) }
+            if (le != null) keep[0] = le
+            keep[0]?.let { (a, isNew) -> AnniversaryEditorSheet(shell, a, isNew, onDismiss = { loveEditing = null }) }
+        }
+        AnimatedVisibility(visible = loveProfileOpen, enter = fadeIn(), exit = fadeOut()) {
+            LoveProfileSheet(shell, onDismiss = { loveProfileOpen = false })
+        }
     }
 }
 
@@ -271,7 +313,7 @@ private fun LiquidTabBar(selected: Tab, backdrop: Backdrop, onSelect: (Tab) -> U
         listOf(
             Triple(Tab.TODAY, s.tabToday, Icons.today), Triple(Tab.CALENDAR, s.tabCalendar, Icons.calendar),
             Triple(Tab.HOLIDAYS, s.tabHolidays, Icons.lotus), Triple(Tab.MOOD, s.tabMood, Icons.mood),
-            Triple(Tab.LIFE, s.tabLife, Icons.life),
+            Triple(Tab.LOVE, s.tabLove, Icons.heart), Triple(Tab.LIFE, s.tabLife, Icons.life),
         )
     }
     val currentSelected by rememberUpdatedState(selected)

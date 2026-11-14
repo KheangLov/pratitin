@@ -26,6 +26,8 @@ enum class EventKind(val emoji: String, val km: String, val en: String) {
     EVENT("📅", "ព្រឹត្តិការណ៍", "Event"),
     BIRTHDAY("🎂", "ខួបកំណើត", "Birthday"),
     NOTE("📝", "កំណត់ចំណាំ", "Note"),
+    /** Mirrored read-only from the Love tab; never stored in events.json. */
+    ANNIVERSARY("💞", "ខួបស្នេហា", "Anniversary"),
 }
 
 /** Reminder choice. All-day items remind at a clock time; timed items relative to start. */

@@ -89,6 +89,7 @@ fun TodayScreen(shell: ShellState) {
     val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
     val moods by shell.vm.moods.collectAsStateWithLifecycle()
     val events by shell.vm.events.collectAsStateWithLifecycle()
+    val love by shell.vm.love.collectAsStateWithLifecycle()
     val s = LocalStrings.current
     val p = LocalPalette.current
 
@@ -154,6 +155,9 @@ fun TodayScreen(shell: ShellState) {
                 KbachDivider(Modifier.padding(horizontal = 26.dp).padding(bottom = 14.dp), height = 12.dp, alpha = 0.55f)
             }
         }
+
+        // ---------------------------------------------------------------- love
+        item(key = "love") { com.pratitin.app.ui.screens.love.TodayLoveCard(shell, love, today, Modifier.enterStagger(2)) }
 
         // ---------------------------------------------------------------- next holiday
         if (next != null) item(key = "next") {

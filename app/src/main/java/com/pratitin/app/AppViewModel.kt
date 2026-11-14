@@ -3,7 +3,12 @@ package com.pratitin.app
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pratitin.app.data.Anniversary
 import com.pratitin.app.data.EventStore
+import com.pratitin.app.data.Lang
+import com.pratitin.app.data.LoveData
+import com.pratitin.app.data.LoveProfile
+import com.pratitin.app.data.LoveStore
 import com.pratitin.app.data.Mood
 import com.pratitin.app.data.MoodEntry
 import com.pratitin.app.data.MoodStore
@@ -19,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -36,12 +42,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val settingsStore = SettingsStore(app)
     private val moodStore = MoodStore(app, viewModelScope)
     private val eventStore = EventStore(app, viewModelScope) { Reminders.rescheduleAsync(app) }
+    private val loveStore = LoveStore(app, viewModelScope) { Reminders.rescheduleAsync(app) }
 
     val settings: StateFlow<Settings?> = settingsStore.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val moods: StateFlow<Map<Int, MoodEntry>> = moodStore.moods
-    val events: StateFlow<List<UserEvent>> = eventStore.events
+    val love: StateFlow<LoveData> = loveStore.data
+
+    /** Your events plus anniversaries mirrored from the Love tab (read-only, negative ids). */
+    val events: StateFlow<List<UserEvent>> = combine(eventStore.events, love, settings) { e, l, st ->
+        if (l.items.isEmpty()) e else e + l.asEvents(st?.lang != Lang.EN)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _today = MutableStateFlow(Day.today())
     /** Packed yyyymmdd; ticks over exactly at midnight. */
@@ -49,6 +61,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** A day to open from a notification tap (consumed by the UI). */
     val pendingOpen = MutableStateFlow(0)
+    /** A tab to open from a notification tap, e.g. "love" (consumed by the UI). */
+    val pendingTab = MutableStateFlow<String?>(null)
 
     init {
         viewModelScope.launch {
@@ -75,6 +89,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteEvent(id: Long) = eventStore.delete(id)
     fun eventsOn(date: Int): List<UserEvent> = events.value.filter { it.occursOn(date) }
         .sortedWith(compareBy({ !it.allDay }, { it.startMin }))
+
+    fun saveAnniversary(a: Anniversary) = loveStore.upsert(a)
+    fun deleteAnniversary(id: Long) = loveStore.delete(id)
+    fun updateLove(t: (LoveProfile) -> LoveProfile) = loveStore.updateProfile(t)
 
     fun updateSettings(transform: (Settings) -> Settings) {
         viewModelScope.launch(Dispatchers.IO) { settingsStore.update(transform) }

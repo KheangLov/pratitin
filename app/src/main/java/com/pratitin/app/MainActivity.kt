@@ -55,6 +55,8 @@ class MainActivity : ComponentActivity() {
     /** A notification tap carries the day it's about — open that day's card. */
     private fun handleIntent(intent: Intent?) {
         val d = intent?.getIntExtra(Reminders.EXTRA_DATE, 0) ?: 0
+        val tab = intent?.getStringExtra(Reminders.EXTRA_TAB)
+        if (tab != null) { vm.pendingTab.value = tab; intent?.removeExtra(Reminders.EXTRA_TAB); intent?.removeExtra(Reminders.EXTRA_DATE); return }
         if (d != 0) { vm.pendingOpen.value = d; intent?.removeExtra(Reminders.EXTRA_DATE) }
     }
 
