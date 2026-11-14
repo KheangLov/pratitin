@@ -127,17 +127,17 @@ fun EventEditorSheet(shell: ShellState, initial: UserEvent, isNew: Boolean, onDi
         GlassCard(
             shell.content,
             Modifier.fillMaxWidth().graphicsLayer { translationY = rise.value * size.height }.navigationBarsPadding().imePadding(),
-            radius = 36.dp, liquid = true, tint = p.night.copy(alpha = if (p.isDark) 0.62f else 0.78f),
+            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.62f else 0.78f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (isNew) s.addEvent else s.editEvent, style = HeritageType.title, color = p.ink, modifier = Modifier.weight(1f))
-                GlassIconButton(shell.content, onClick = onDismiss, size = 38.dp, icon = Icons.close)
+                GlassIconButton(null, onClick = onDismiss, size = 38.dp, icon = Icons.close)
             }
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 // kind
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                     EventKind.entries.filter { it != EventKind.ANNIVERSARY }.forEach { k ->
-                        GlassChip(if (s.lang == Lang.KM) k.km else k.en, e.kind == k, shell.content, leading = k.emoji) {
+                        GlassChip(if (s.lang == Lang.KM) k.km else k.en, e.kind == k, null, leading = k.emoji) {
                             e = e.copy(
                                 kind = k,
                                 allDay = if (k == EventKind.EVENT) e.allDay else true,
@@ -159,9 +159,9 @@ fun EventEditorSheet(shell: ShellState, initial: UserEvent, isNew: Boolean, onDi
                         Text(gregorianLong(e.start, s), style = HeritageType.body, color = p.ink)
                         Text(lunarLine(k, s), style = HeritageType.micro, color = p.gold)
                     }
-                    GlassIconButton(shell.content, onClick = { e = e.copy(start = Day.plusDays(e.start, -1)) }, size = 34.dp, icon = Icons.chevronLeft)
+                    GlassIconButton(null, onClick = { e = e.copy(start = Day.plusDays(e.start, -1)) }, size = 34.dp, icon = Icons.chevronLeft)
                     Spacer(Modifier.width(6.dp))
-                    GlassIconButton(shell.content, onClick = { e = e.copy(start = Day.plusDays(e.start, 1)) }, size = 34.dp, icon = Icons.chevronRight)
+                    GlassIconButton(null, onClick = { e = e.copy(start = Day.plusDays(e.start, 1)) }, size = 34.dp, icon = Icons.chevronRight)
                 }
 
                 // time
@@ -181,7 +181,7 @@ fun EventEditorSheet(shell: ShellState, initial: UserEvent, isNew: Boolean, onDi
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(15, 30, 60, 90, 120, 180).forEach { m ->
                                     val label = if (m < 60) "${s.num(m)}′" else "${s.num(m / 60)}${if (m % 60 != 0) "½" else ""}h"
-                                    GlassChip(label, e.durationMin == m, shell.content) { e = e.copy(durationMin = m) }
+                                    GlassChip(label, e.durationMin == m, null) { e = e.copy(durationMin = m) }
                                 }
                             }
                         }
@@ -194,7 +194,7 @@ fun EventEditorSheet(shell: ShellState, initial: UserEvent, isNew: Boolean, onDi
                 Spacer(Modifier.height(6.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Repeat.entries.forEachIndexed { i, r ->
-                        GlassChip(s.repeatNames[i], e.repeat == r, shell.content, accent = if (r == Repeat.LUNAR_YEARLY) p.lotus else p.gold,
+                        GlassChip(s.repeatNames[i], e.repeat == r, null, accent = if (r == Repeat.LUNAR_YEARLY) p.lotus else p.gold,
                             leading = if (r == Repeat.LUNAR_YEARLY) "🌕" else null) { e = e.copy(repeat = r) }
                     }
                 }
@@ -211,7 +211,7 @@ fun EventEditorSheet(shell: ShellState, initial: UserEvent, isNew: Boolean, onDi
                 Spacer(Modifier.height(6.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Remind.entries.filter { e.allDay.not() || it !in setOf(Remind.MIN_10, Remind.MIN_30, Remind.HOUR_1) }.forEach { r ->
-                        GlassChip(if (s.lang == Lang.KM) r.km else r.en, e.remind == r, shell.content, accent = p.jade) { e = e.copy(remind = r) }
+                        GlassChip(if (s.lang == Lang.KM) r.km else r.en, e.remind == r, null, accent = p.jade) { e = e.copy(remind = r) }
                     }
                 }
 

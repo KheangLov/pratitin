@@ -22,6 +22,7 @@ import com.pratitin.app.ui.screens.events.newEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import kotlin.math.abs
@@ -184,6 +185,9 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
     var x by remember { mutableFloatStateOf(0f) }
     var width by remember { mutableFloatStateOf(1f) }
     var settleJob by remember { mutableStateOf<Job?>(null) }
+    // true from finger-down until the deck has settled: new cards wait for this to clear
+    // before composing their full (Khmer text, moon, mood picker…) content
+    val busy = remember { mutableStateOf(false) }
     val currentDate by rememberUpdatedState(date)
     val density = LocalDensity.current
     val lift = with(density) { 20.dp.toPx() }
@@ -207,7 +211,7 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
             .pointerInput(Unit) {
                 val tracker = VelocityTracker()
                 detectHorizontalDragGestures(
-                    onDragStart = { settleJob?.cancel(); tracker.resetTracking() },
+                    onDragStart = { settleJob?.cancel(); tracker.resetTracking(); busy.value = true },
                     onHorizontalDrag = { change, dx ->
                         tracker.addPosition(change.uptimeMillis, change.position)
                         change.consume()
@@ -221,6 +225,7 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
                             else -> 0
                         }
                         settleJob = scope.launch {
+                            try {
                             if (dir == 0) {
                                 animate(x, 0f, v, spring(dampingRatio = 0.7f, stiffness = 500f)) { value, _ -> x = value }
                             } else {
@@ -231,14 +236,16 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
                                 onNavigate(Day.plusDays(currentDate, dir.toLong()))
                                 x = 0f
                             }
+                            } finally { busy.value = false }
                         }
                     },
-                    onDragCancel = { settleJob = scope.launch { animate(x, 0f, 0f, spring(dampingRatio = 0.7f)) { value, _ -> x = value } } },
+                    onDragCancel = { settleJob = scope.launch { try { animate(x, 0f, 0f, spring(dampingRatio = 0.7f)) { value, _ -> x = value } } finally { busy.value = false } } },
                 )
             },
     ) {
         // bottom of the deck: an empty card for depth (cheap — no content)
         DeckCard(Modifier.fillMaxSize().graphicsLayer {
+            shape = CardShape; clip = true
             val k = progress()
             val sc = 0.88f + 0.06f * k
             scaleX = sc; scaleY = sc
@@ -252,9 +259,11 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
         // z-order = loop order; the top card is always last.
         for (d in listOf(Day.plusDays(date, -2), Day.plusDays(date, 2), prev, next, date)) {
             key(d) {
-                DayCard(shell, d, eager = d == date, delayMs = if (d == prev || d == next) 320L else 800L, modifier = Modifier.fillMaxSize().graphicsLayer {
+                DayCard(shell, d, eager = d == date, delayMs = if (d == prev || d == next) 320L else 800L, busy = { busy.value }, modifier = Modifier.fillMaxSize().graphicsLayer {
+                    shape = CardShape; clip = true
                     when (d) {
                         date -> {
+                            shadowElevation = 10.dp.toPx()
                             translationX = x
                             translationY = abs(x) * 0.05f
                             rotationZ = x / width * 8f
@@ -266,19 +275,27 @@ private fun CardStack(shell: ShellState, date: Int, onNavigate: (Int) -> Unit, m
                             // the neighbour on the side you're dragging toward rises up
                             val showing = if (d == next) x <= 0f else x > 0f
                             val k = if (showing) progress() else 0f
+                            shadowElevation = 0f
                             val sc = 0.94f + 0.06f * k
                             scaleX = sc; scaleY = sc
                             translationX = 0f; rotationZ = 0f
                             translationY = lift * (1f - k)
                             alpha = if (showing) 1f else 0f
                         }
-                        else -> alpha = 0f // far neighbours: composed but never drawn
+                        else -> { alpha = 0f; shadowElevation = 0f } // far neighbours: composed but never drawn
                     }
                 })
             }
         }
     }
 }
+
+/**
+ * Cards use a plain rounded-rect outline (not the squircle path): the RenderThread clips and
+ * casts the shadow of a round rect natively, while a path clip + path shadow had to be redone
+ * on every frame of a rotating, sliding card.
+ */
+private val CardShape = androidx.compose.foundation.shape.RoundedCornerShape(38.dp)
 
 /** Process-wide: the teaching nudge plays once per app session. */
 private var nudged = false
@@ -287,15 +304,15 @@ private var nudged = false
 private fun DeckCard(modifier: Modifier) {
     val p = LocalPalette.current
     Box(
-        modifier.clip(Squircles.xl)
+        modifier
             .background(if (p.isDark) Color(0xFF1B1121) else Color(0xFFF1E2C8))
-            .border(1.dp, p.gold.copy(alpha = 0.3f), Squircles.xl),
+            .border(1.dp, p.gold.copy(alpha = 0.3f), CardShape),
     )
 }
 
 /** A solid "physical" day card — lacquer surface, gilded rim and kbach corners. */
 @Composable
-private fun DayCard(shell: ShellState, d: Int, eager: Boolean, delayMs: Long, modifier: Modifier) {
+private fun DayCard(shell: ShellState, d: Int, eager: Boolean, delayMs: Long, busy: () -> Boolean, modifier: Modifier) {
     val p = LocalPalette.current
     val s = LocalStrings.current
     val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
@@ -306,7 +323,15 @@ private fun DayCard(shell: ShellState, d: Int, eager: Boolean, delayMs: Long, mo
     // content on the next frame, so the swap frame itself stays cheap.
     var full by remember { mutableStateOf(eager) }
     // staggered so opening the sheet never composes several heavy cards in one frame
-    LaunchedEffect(Unit) { if (!full) { withFrameNanos { }; delay(delayMs); full = true } }
+    // …and never in the middle of a swipe: wait until the deck is still.
+    LaunchedEffect(Unit) {
+        if (!full) {
+            withFrameNanos { }; delay(delayMs)
+            androidx.compose.runtime.snapshotFlow { busy() }.first { !it }
+            withFrameNanos { }
+            full = true
+        }
+    }
     val surface = remember(p.isDark) {
         if (p.isDark) Brush.verticalGradient(listOf(Color(0xFF231629), Color(0xFF140C1B)))
         else Brush.verticalGradient(listOf(Color(0xFFFFFAF1), Color(0xFFF3E4CC)))
@@ -314,10 +339,8 @@ private fun DayCard(shell: ShellState, d: Int, eager: Boolean, delayMs: Long, mo
     val dayEvents = remember(events, d) { events.filter { it.occursOn(d) }.sortedWith(compareBy({ !it.allDay }, { it.startMin })) }
     Box(
         modifier
-            .shadow(10.dp, Squircles.xl, ambientColor = Color.Black, spotColor = Color.Black)
-            .clip(Squircles.xl)
             .background(surface)
-            .border(1.dp, p.gold.copy(alpha = 0.45f), Squircles.xl)
+            .border(1.dp, p.gold.copy(alpha = 0.45f), CardShape)
             .drawBehind { drawAllCorners(p.gold.copy(alpha = 0.35f), 20.dp.toPx()) },
     ) {
         if (!full) {

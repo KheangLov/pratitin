@@ -111,8 +111,7 @@ fun GlassChip(
         modifier
             .pressScale(interaction)
             .glass(backdrop, Squircles.pill, cornerRadius = 100.dp)
-            .clip(Squircles.pill)
-            .background(fill)
+            .background(fill, Squircles.pill)
             .clickable(interaction, indication = null, role = Role.Tab) {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick()
             }

@@ -79,34 +79,34 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
         GlassCard(
             shell.content,
             Modifier.fillMaxWidth().graphicsLayer { translationY = rise.value * size.height }.navigationBarsPadding(),
-            radius = 36.dp, liquid = true, tint = p.night.copy(alpha = if (p.isDark) 0.6f else 0.75f),
+            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.6f else 0.75f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(s.settings, style = HeritageType.title, color = p.ink, modifier = Modifier.weight(1f))
-                GlassIconButton(shell.content, onClick = onDismiss, size = 38.dp, icon = Icons.close)
+                GlassIconButton(null, onClick = onDismiss, size = 38.dp, icon = Icons.close)
             }
             KbachDivider(Modifier.padding(vertical = 8.dp), height = 10.dp, alpha = 0.5f)
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 SectionTitle(s.language)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GlassChip("ខ្មែរ", settings.lang == Lang.KM, shell.content, leading = "🇰🇭") { upd { it.copy(lang = Lang.KM) } }
-                    GlassChip("English", settings.lang == Lang.EN, shell.content, leading = "🌐") { upd { it.copy(lang = Lang.EN) } }
+                    GlassChip("ខ្មែរ", settings.lang == Lang.KM, null, leading = "🇰🇭") { upd { it.copy(lang = Lang.KM) } }
+                    GlassChip("English", settings.lang == Lang.EN, null, leading = "🌐") { upd { it.copy(lang = Lang.EN) } }
                 }
                 Spacer(Modifier.height(16.dp))
                 SectionTitle(s.theme)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GlassChip(s.dark, settings.theme == ThemeMode.DARK, shell.content, leading = "🌙") { upd { it.copy(theme = ThemeMode.DARK) } }
-                    GlassChip(s.light, settings.theme == ThemeMode.LIGHT, shell.content, leading = "☀️") { upd { it.copy(theme = ThemeMode.LIGHT) } }
-                    GlassChip(s.system, settings.theme == ThemeMode.SYSTEM, shell.content) { upd { it.copy(theme = ThemeMode.SYSTEM) } }
+                    GlassChip(s.dark, settings.theme == ThemeMode.DARK, null, leading = "🌙") { upd { it.copy(theme = ThemeMode.DARK) } }
+                    GlassChip(s.light, settings.theme == ThemeMode.LIGHT, null, leading = "☀️") { upd { it.copy(theme = ThemeMode.LIGHT) } }
+                    GlassChip(s.system, settings.theme == ThemeMode.SYSTEM, null) { upd { it.copy(theme = ThemeMode.SYSTEM) } }
                 }
                 Spacer(Modifier.height(16.dp))
                 SectionTitle(s.background)
                 Spacer(Modifier.height(8.dp))
                 androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("✨", "🌙", "🏵️", "🪷").forEachIndexed { i, e ->
-                        GlassChip(s.sceneNames[i], settings.scene == i, shell.content, leading = e) { upd { it.copy(scene = i) } }
+                        GlassChip(s.sceneNames[i], settings.scene == i, null, leading = e) { upd { it.copy(scene = i) } }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -118,11 +118,11 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
                 SettingRow(s.showSila) { LiquidToggle(settings.showSila, { v -> upd { it.copy(showSila = v) } }) }
                 SettingRow(s.maxLeave) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        (1..3).forEach { n -> GlassChip(s.num(n), settings.maxLeave == n, shell.content) { upd { it.copy(maxLeave = n) } } }
+                        (1..3).forEach { n -> GlassChip(s.num(n), settings.maxLeave == n, null) { upd { it.copy(maxLeave = n) } } }
                     }
                 }
                 SettingRow(s.setBirthday) {
-                    GlassChip("→", false, shell.content) { onDismiss(); shell.goTo(Tab.LIFE) }
+                    GlassChip("→", false, null) { onDismiss(); shell.goTo(Tab.LIFE) }
                 }
                 // ---- reminders
                 Spacer(Modifier.height(16.dp))
@@ -138,8 +138,8 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
                         SettingRow("🪷 ${s.rMood}") { LiquidToggle(settings.notifyMood, { v -> upd { it.copy(notifyMood = v) } }) }
                         Text(s.rWhen, style = HeritageType.micro, color = p.inkSoft, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            GlassChip(s.rEve, settings.holidayEve, shell.content, leading = "🌙") { upd { it.copy(holidayEve = true) } }
-                            GlassChip(s.rMorning, !settings.holidayEve, shell.content, leading = "☀️") { upd { it.copy(holidayEve = false) } }
+                            GlassChip(s.rEve, settings.holidayEve, null, leading = "🌙") { upd { it.copy(holidayEve = true) } }
+                            GlassChip(s.rMorning, !settings.holidayEve, null, leading = "☀️") { upd { it.copy(holidayEve = false) } }
                         }
                     }
                 }

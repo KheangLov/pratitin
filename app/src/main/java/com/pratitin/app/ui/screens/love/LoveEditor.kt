@@ -129,20 +129,20 @@ fun AnniversaryEditorSheet(shell: ShellState, initial: Anniversary, isNew: Boole
         GlassCard(
             shell.content,
             Modifier.fillMaxWidth().graphicsLayer { translationY = rise.value * size.height }.navigationBarsPadding().imePadding(),
-            radius = 36.dp, liquid = true, tint = p.night.copy(alpha = if (p.isDark) 0.66f else 0.8f),
+            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.66f else 0.8f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "${a.kind.emoji} " + if (isNew) (if (km) "ខួបថ្មី" else "New anniversary") else (if (km) "កែប្រែខួប" else "Edit anniversary"),
                     style = HeritageType.title, color = p.ink, modifier = Modifier.weight(1f),
                 )
-                GlassIconButton(shell.content, onClick = onDismiss, size = 38.dp, icon = Icons.close)
+                GlassIconButton(null, onClick = onDismiss, size = 38.dp, icon = Icons.close)
             }
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 // kind
                 FlowRow(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     AnnivKind.entries.forEach { k ->
-                        GlassChip(if (km) k.km else k.en, a.kind == k, shell.content, accent = lp.rose, leading = k.emoji) { a = a.copy(kind = k) }
+                        GlassChip(if (km) k.km else k.en, a.kind == k, null, accent = lp.rose, leading = k.emoji) { a = a.copy(kind = k) }
                     }
                 }
                 // title
@@ -160,9 +160,9 @@ fun AnniversaryEditorSheet(shell: ShellState, initial: Anniversary, isNew: Boole
                         Text(gregorianLong(a.date, s), style = HeritageType.body, color = p.ink)
                         Text("🌕 " + lunarLine(k, s), style = HeritageType.micro, color = p.gold)
                     }
-                    GlassIconButton(shell.content, onClick = { a = a.copy(date = Day.plusDays(a.date, -1)) }, size = 34.dp, icon = Icons.chevronLeft)
+                    GlassIconButton(null, onClick = { a = a.copy(date = Day.plusDays(a.date, -1)) }, size = 34.dp, icon = Icons.chevronLeft)
                     Spacer(Modifier.width(6.dp))
-                    GlassIconButton(shell.content, onClick = { a = a.copy(date = Day.plusDays(a.date, 1)) }, size = 34.dp, icon = Icons.chevronRight)
+                    GlassIconButton(null, onClick = { a = a.copy(date = Day.plusDays(a.date, 1)) }, size = 34.dp, icon = Icons.chevronRight)
                 }
                 // live preview of the count
                 val e = remember(a.date, today) { LoveMath.elapsed(a.date, today) }
@@ -178,8 +178,8 @@ fun AnniversaryEditorSheet(shell: ShellState, initial: Anniversary, isNew: Boole
                 Text(if (km) "ប្រារព្ធតាម" else "Celebrate by", style = HeritageType.micro, color = p.inkSoft)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    GlassChip(if (km) "សុរិយគតិ" else "Solar date", !a.lunar, shell.content, accent = lp.rose, leading = "☀️") { a = a.copy(lunar = false) }
-                    GlassChip(if (km) "ចន្ទគតិខ្មែរ" else "Khmer lunar", a.lunar, shell.content, accent = p.gold, leading = "🌕") { a = a.copy(lunar = true) }
+                    GlassChip(if (km) "សុរិយគតិ" else "Solar date", !a.lunar, null, accent = lp.rose, leading = "☀️") { a = a.copy(lunar = false) }
+                    GlassChip(if (km) "ចន្ទគតិខ្មែរ" else "Khmer lunar", a.lunar, null, accent = p.gold, leading = "🌕") { a = a.copy(lunar = true) }
                 }
                 if (a.lunar) Text(
                     if (km) "រៀងរាល់ឆ្នាំ នៅ ${lunarLine(k, s)}" else "Every year on ${lunarLine(k, s)}",
@@ -203,7 +203,7 @@ fun AnniversaryEditorSheet(shell: ShellState, initial: Anniversary, isNew: Boole
                                     14 -> if (km) "២ សប្ដាហ៍" else "2 weeks"
                                     else -> if (km) "${s.num(d)} ថ្ងៃ" else "$d day${if (d > 1) "s" else ""}"
                                 }
-                                GlassChip(label, a.daysBefore == d, shell.content, accent = p.jade) { a = a.copy(daysBefore = d) }
+                                GlassChip(label, a.daysBefore == d, null, accent = p.jade) { a = a.copy(daysBefore = d) }
                             }
                         }
                         Text(
@@ -298,11 +298,11 @@ fun LoveProfileSheet(shell: ShellState, onDismiss: () -> Unit) {
         GlassCard(
             shell.content,
             Modifier.fillMaxWidth().graphicsLayer { translationY = rise.value * size.height }.navigationBarsPadding().imePadding(),
-            radius = 36.dp, liquid = true, tint = p.night.copy(alpha = if (p.isDark) 0.66f else 0.8f),
+            radius = 36.dp, tint = p.night.copy(alpha = if (p.isDark) 0.66f else 0.8f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (km) "💞 យើងទាំងពីរ" else "💞 The two of us", style = HeritageType.title, color = p.ink, modifier = Modifier.weight(1f))
-                GlassIconButton(shell.content, onClick = { save(); onDismiss() }, size = 38.dp, icon = Icons.close)
+                GlassIconButton(null, onClick = { save(); onDismiss() }, size = 38.dp, icon = Icons.close)
             }
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Spacer(Modifier.height(8.dp))

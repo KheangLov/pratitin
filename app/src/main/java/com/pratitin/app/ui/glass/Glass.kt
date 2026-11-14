@@ -158,6 +158,15 @@ fun Modifier.glass(
             )
             val strokePx = strokeWidth.toPx()
             onDrawBehind {
+                val bd0 = safeBackdrop
+                if (bd0 == null || !CAN_BLUR || !bd0.ready) {
+                    // No blur to sample (e.g. chips on an already-frosted sheet): plain filled
+                    // paths — far cheaper than a path clip, which costs a stencil pass per draw.
+                    drawPath(path, wash)
+                    drawPath(path, sheen)
+                    drawPath(path, rim, style = Stroke(strokePx))
+                    return@onDrawBehind
+                }
                 clipPath(path) {
                     val bd = safeBackdrop
                     if (bd != null && CAN_BLUR && bd.ready) {
