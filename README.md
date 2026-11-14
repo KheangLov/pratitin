@@ -78,6 +78,12 @@ app/
 - **Data:** dates are packed `Int`s (`yyyymmdd`) throughout, which means no allocations and stable Compose inputs. A stability config marks the engine's data classes as stable.
 - **Living sky:** the sky animates at 30 fps and stops when the user turns it off, or when the system's "Remove animations" setting is on.
 - **Release build:** R8 shrinking and resource shrinking are on, plus a ProfileInstaller for baseline profiles.
+- **One ambient clock:** every decorative loop (sky, moon glow, bobbing badge, lotus, hearts) reads one shared clock that ticks at ~30 fps and falls asleep after 25 s without a touch. `rememberInfiniteTransition` is not used for ambient motion: each one requests a frame on every vsync (up to 120 Hz) forever, and with a glass backdrop every frame re-renders and re-blurs the scene.
+- **Strip-only content blur:** the shell's second backdrop (what the tab bar and sheets see through) blurs only the tab-bar band while no glass sheet is open, instead of the whole screen every frame.
+- **Liquid lens only where it shows:** the AGSL refraction pass (one offscreen render per element per frame) is limited to the tab bar, hero cards and sheets; buttons and list cards use plain frost.
+- **Entrances play once:** list items that scroll into view later appear instantly, and the fade uses `ModulateAlpha` (no offscreen buffer per card).
+- **Off-main-thread audio:** songs are decoded and prepared on a background thread.
+- **App baseline profile:** `app/src/main/baseline-prof.txt` AOT-compiles the app and engine packages at install.
 
 ---
 

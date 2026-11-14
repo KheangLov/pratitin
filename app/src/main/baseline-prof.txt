@@ -1,0 +1,8 @@
+# Baseline profile: ask ART to compile the app's own code ahead of time at install,
+# so the first launches and first scrolls don't run interpreted / JIT-warming code.
+# Compose, Glance and AndroidX ship their own profiles; these rules cover our packages.
+# (AGP compiles this file into assets/dexopt/baseline.prof; ProfileInstaller installs it.)
+Lcom/pratitin/app/**;
+HSPLcom/pratitin/app/**->**(**)**
+Lcom/pratitin/khmer/**;
+HSPLcom/pratitin/khmer/**->**(**)**

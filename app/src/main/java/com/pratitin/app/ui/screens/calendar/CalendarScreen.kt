@@ -177,7 +177,7 @@ fun CalendarScreen(shell: ShellState) {
 
         // ------------------------------------------------------------ grid
         item(key = "grid") {
-            GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(2), liquid = true, radius = 30.dp, padding = PaddingValues(10.dp)) {
+            GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(2), radius = 30.dp, padding = PaddingValues(10.dp)) {
                 WeekdayHeader(settings.weekStartsMonday, s)
                 Spacer(Modifier.height(4.dp))
                 HorizontalPager(state = pager, beyondViewportPageCount = 1, pageSpacing = 12.dp) { pg ->

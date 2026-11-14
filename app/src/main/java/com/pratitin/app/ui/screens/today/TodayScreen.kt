@@ -254,9 +254,9 @@ private fun HeroMoon(illumination: Float, waxing: Boolean, modifier: Modifier) {
     val reduce = LocalReduceMotion.current
     val anim = remember { Animatable(if (reduce) illumination else 0f) }
     LaunchedEffect(illumination) { anim.animateTo(illumination, Motion.gentle) }
-    val inf = rememberInfiniteTransition(label = "moon")
-    val glow by inf.animateFloat(0.85f, 1.1f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
+    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
     Canvas(modifier) {
+        val glow = 0.85f + 0.25f * (clock?.let { com.pratitin.app.ui.motion.pingPong(it.time, 6.4f) } ?: 0.6f)
         val r = size.minDimension * 0.36f
         drawCircle(Brush.radialGradient(listOf(p.goldSoft.copy(alpha = 0.28f * glow), Color.Transparent), center, size.minDimension * 0.5f * glow))
         drawMoon(center, r, anim.value, waxing, p.moon, p.nightDeep.copy(alpha = 0.55f), glow = false)
@@ -267,10 +267,12 @@ private fun HeroMoon(illumination: Float, waxing: Boolean, modifier: Modifier) {
 @Composable
 private fun AnimalBadge(animal: Int) {
     val p = LocalPalette.current
-    val inf = rememberInfiniteTransition(label = "bob")
-    val bob by inf.animateFloat(-3f, 3f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "bobY")
+    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
     Box(
-        Modifier.size(52.dp).graphicsLayer { translationY = bob * density }.clip(Squircles.m).background(p.gold.copy(alpha = 0.14f)),
+        Modifier.size(52.dp).graphicsLayer {
+            val bob = clock?.let { -3f + 6f * com.pratitin.app.ui.motion.pingPong(it.time, 4.8f) } ?: 0f
+            translationY = bob * density
+        }.clip(Squircles.m).background(p.gold.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center,
     ) { Text(ANIMAL_EMOJI[animal], fontSize = 28.sp) }
 }
@@ -343,12 +345,12 @@ private fun SongkranCard(shell: ShellState, today: Int, modifier: Modifier) {
     val nyPacked = ny.year * 10000 + ny.month * 100 + ny.day
     val days = Day.between(today, nyPacked).toInt()
     val nextAnimal = remember(ny) { KhmerCalendar.fromGregorian(ny.year, ny.month, ny.day, 23, 59).animalYear }
-    val inf = rememberInfiniteTransition(label = "lotus")
-    val bloom by inf.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2800), RepeatMode.Reverse), label = "bloom")
+    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
 
     GlassCard(shell.bg, modifier.fillMaxWidth(), tint = p.lacquer.copy(alpha = 0.18f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Canvas(Modifier.size(70.dp)) {
+                val bloom = 0.55f + 0.45f * (clock?.let { com.pratitin.app.ui.motion.pingPong(it.time, 5.6f, 0.3f) } ?: 1f)
                 drawLotus(Offset(center.x, size.height * 0.92f), size.height * 0.85f, bloom, p.lotus, p.goldSoft)
             }
             Spacer(Modifier.width(14.dp))

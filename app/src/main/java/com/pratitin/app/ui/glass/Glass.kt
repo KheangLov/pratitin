@@ -8,6 +8,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,6 +65,13 @@ class Backdrop internal constructor(
 ) {
     internal var origin by mutableStateOf(Offset.Zero)
     internal var ready by mutableStateOf(false)
+
+    /**
+     * Only the part of the source below this y (px) is blurred. The shell sets it to the
+     * tab-bar strip while no glass sheet is open, so the full-screen re-blur that the
+     * tab bar would otherwise trigger every frame shrinks to a thin band.
+     */
+    var captureTop by mutableFloatStateOf(0f)
     internal var appliedBlurPx = -1f
     internal val scale = 0.25f
 }
@@ -98,8 +106,11 @@ fun Modifier.backdropSource(backdrop: Backdrop): Modifier = this
                 backdrop.blurred.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
                 backdrop.appliedBlurPx = blurPx
             }
-            val small = IntSize(max(1, (size.width * s).toInt()), max(1, (size.height * s).toInt()))
-            backdrop.blurred.record(this, layoutDirection, small) { scale(s, s, pivot = Offset.Zero) { drawLayer(src) } }
+            val top = backdrop.captureTop.coerceIn(0f, (size.height - 1f).coerceAtLeast(0f))
+            val small = IntSize(max(1, (size.width * s).toInt()), max(1, ((size.height - top) * s).toInt()))
+            backdrop.blurred.record(this, layoutDirection, small) {
+                scale(s, s, pivot = Offset.Zero) { translate(0f, -top) { drawLayer(src) } }
+            }
             if (!backdrop.ready) backdrop.ready = true
         }
     }
@@ -150,7 +161,7 @@ fun Modifier.glass(
                 clipPath(path) {
                     val bd = safeBackdrop
                     if (bd != null && CAN_BLUR && bd.ready) {
-                        val off = position - bd.origin
+                        val off = position - bd.origin - Offset(0f, bd.captureTop)
                         val inv = 1f / bd.scale
                         if (lens != null) {
                             lens.record(this, layoutDirection, IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1))) {

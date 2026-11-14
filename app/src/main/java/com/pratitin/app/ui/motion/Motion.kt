@@ -25,6 +25,9 @@ object Motion {
     val press = spring<Float>(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)
 }
 
+/** uptimeMillis when the current screen was opened; entrances only play right after it. */
+val LocalScreenBirth = androidx.compose.runtime.staticCompositionLocalOf { 0L }
+
 /** True when the user turned animations off in system settings — we honour it everywhere. */
 val LocalReduceMotion = compositionLocalOf { false }
 
@@ -52,13 +55,18 @@ fun Modifier.pressScale(interaction: MutableInteractionSource, pressed: Float = 
  * composition. Values are read only inside graphicsLayer → draw-phase only.
  */
 fun Modifier.enterStagger(index: Int, stepMs: Long = 35, rise: Float = 36f): Modifier = composed {
-    val reduce = LocalReduceMotion.current
-    val p = remember { Animatable(if (reduce) 1f else 0f) }
+    // Items that scroll into view later (LazyColumn recomposes them) appear instantly:
+    // replaying the entrance on every scroll made lists churn and forced extra layers.
+    val birth = LocalScreenBirth.current
+    val play = !LocalReduceMotion.current && android.os.SystemClock.uptimeMillis() - birth < 700
+    val p = remember { Animatable(if (play) 0f else 1f) }
     LaunchedEffect(Unit) {
-        if (!reduce) { delay(index.coerceAtMost(18) * stepMs); p.animateTo(1f, Motion.snappy) }
+        if (play) { delay(index.coerceAtMost(18) * stepMs); p.animateTo(1f, Motion.snappy) }
     }
     graphicsLayer {
         val v = p.value
+        // ModulateAlpha: fade by multiplying each draw, no offscreen buffer per card
+        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
         alpha = v.coerceIn(0f, 1f)
         translationY = (1f - v) * rise
         val s = 0.96f + 0.04f * v

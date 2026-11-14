@@ -129,10 +129,10 @@ fun LifeScreen(shell: ShellState) {
 
         if (settings.birthDate == 0) {
             item(key = "cta") {
-                GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(1), liquid = true, onClick = { picking = true }) {
-                    val inf = rememberInfiniteTransition(label = "cta")
-                    val bloom by inf.animateFloat(0.3f, 1f, infiniteRepeatable(tween(2600), RepeatMode.Reverse), label = "b")
+                GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(1), onClick = { picking = true }) {
+                    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
                     Canvas(Modifier.fillMaxWidth().height(120.dp)) {
+                        val bloom = 0.3f + 0.7f * (clock?.let { com.pratitin.app.ui.motion.pingPong(it.time, 5.2f) } ?: 1f)
                         drawLotus(Offset(center.x, size.height * 0.95f), size.height * 0.9f, bloom, p.lotus, p.goldSoft)
                     }
                     Text(s.setBirthday, style = HeritageType.title, color = p.ink, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -146,7 +146,7 @@ fun LifeScreen(shell: ShellState) {
         val ageYears = Day.unpack(settings.birthDate).until(Day.unpack(today)).years
 
         item(key = "stats") {
-            GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(1), liquid = true, onClick = { picking = true }) {
+            GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(1), onClick = { picking = true }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ProgressRing(lived / total.toFloat(), Modifier.size(86.dp), stroke = 7.dp) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {

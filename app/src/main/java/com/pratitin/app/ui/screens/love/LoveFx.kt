@@ -74,7 +74,7 @@ private class Floater(val x: Float, val speed: Float, val size: Float, val phase
 fun LoveAmbience(modifier: Modifier = Modifier) {
     val lp = lovePalette()
     val p = LocalPalette.current
-    val reduce = LocalReduceMotion.current
+    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
     val floaters = remember {
         val r = java.util.Random(214)
         List(26) { i ->
@@ -84,11 +84,10 @@ fun LoveAmbience(modifier: Modifier = Modifier) {
             )
         }
     }
-    val clock = if (reduce) null else rememberInfiniteTransition(label = "ambience")
-        .animateFloat(0f, 1f, infiniteRepeatable(tween(48_000, easing = LinearEasing), RepeatMode.Restart), label = "t")
     val path = remember { Path() }
     Canvas(modifier) {
-        val t = clock?.value ?: 0.3f
+        // one 48 s cycle of the shared ambient clock (30 fps, sleeps when idle)
+        val t = clock?.let { (it.time / 48f) % 1f } ?: 0.3f
         // veil: wine at the top, fading through, a blush glow low down
         drawRect(Brush.verticalGradient(
             0f to lp.wine.copy(alpha = if (p.isDark) 0.55f else 0.22f),
@@ -128,18 +127,11 @@ fun DrawScope.drawSparkle(c: Offset, r: Float, color: Color) {
     drawPath(p, color)
 }
 
-/** Lub-dub: two beats then a rest. Returns a State read only in draw/graphicsLayer. */
+/** Lub-dub: two beats then a rest, from the shared ambient clock. Read only in draw/graphicsLayer. */
 @Composable
-fun rememberHeartbeat(): State<Float>? {
-    if (LocalReduceMotion.current) return null
-    return rememberInfiniteTransition(label = "beat").animateFloat(
-        1f, 1f,
-        infiniteRepeatable(keyframes {
-            durationMillis = 1250
-            1f at 0; 1.12f at 110; 0.98f at 230; 1.07f at 340; 1f at 560
-        }),
-        label = "beat",
-    )
+fun rememberHeartbeat(): (() -> Float)? {
+    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current ?: return null
+    return remember(clock) { { com.pratitin.app.ui.motion.heartbeatAt(clock.time) } }
 }
 
 /**
@@ -154,8 +146,7 @@ fun BeatingHeart(heartSize: Dp, modifier: Modifier = Modifier, onTap: () -> Unit
     val scope = rememberCoroutineScope()
     val burst = remember { Animatable(1f) }
     var seed by remember { mutableIntStateOf(1) }
-    val rings = if (LocalReduceMotion.current) null else rememberInfiniteTransition(label = "rings")
-        .animateFloat(0f, 1f, infiniteRepeatable(tween(2500, easing = LinearEasing)), label = "ring")
+    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
     val path = remember { Path() }
     val small = remember { Path() }
     Box(
@@ -163,7 +154,7 @@ fun BeatingHeart(heartSize: Dp, modifier: Modifier = Modifier, onTap: () -> Unit
             .drawBehind {
                 // pulse rings
                 val base = heartSize.toPx()
-                rings?.value?.let { r ->
+                clock?.let { (it.time / 2.5f) % 1f }?.let { r ->
                     for (k in 0..2) {
                         val ph = (r + k / 3f) % 1f
                         val w = base * (1f + ph * 0.75f)
@@ -193,7 +184,7 @@ fun BeatingHeart(heartSize: Dp, modifier: Modifier = Modifier, onTap: () -> Unit
             },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(heartSize).graphicsLayer { val k = beat?.value ?: 1f; scaleX = k; scaleY = k }) {
+        Canvas(Modifier.size(heartSize).graphicsLayer { val k = beat?.invoke() ?: 1f; scaleX = k; scaleY = k }) {
             val w = this.size.width
             val top = Offset(0f, this.size.height * 0.05f)
             // soft glow behind

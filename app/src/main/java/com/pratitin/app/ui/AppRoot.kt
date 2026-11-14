@@ -12,6 +12,10 @@ import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import com.pratitin.app.ui.motion.wakesAmbient
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -144,6 +148,7 @@ fun AppRoot(vm: AppViewModel) {
 
 @Composable
 private fun Shell(vm: AppViewModel, animateSky: Boolean) {
+    val reduceMotion = com.pratitin.app.ui.motion.LocalReduceMotion.current
     val bg = rememberBackdrop(32.dp)
     val content = rememberBackdrop(24.dp)
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
@@ -221,7 +226,25 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(LocalPalette.current.night)) {
+    // ---- performance: one shared ambient clock (≈30 fps, sleeps after idle), paused under sheets
+    val anySheet = detailOpen || settingsOpen || editing != null || loveEditing != null || loveProfileOpen
+    val ambient = com.pratitin.app.ui.motion.rememberAmbientClock(running = !reduceMotion && !anySheet)
+    // ---- performance: blur only the tab-bar strip unless a glass sheet needs the whole screen
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val navBottom = WindowInsets.navigationBars.getBottom(density)
+    var rootH by remember { mutableIntStateOf(0) }
+    val glassSheet = settingsOpen || editing != null || loveEditing != null || loveProfileOpen
+    androidx.compose.runtime.SideEffect {
+        content.captureTop = if (glassSheet || rootH == 0) 0f
+            else (rootH - navBottom - with(density) { 112.dp.toPx() }).coerceAtLeast(0f)
+    }
+
+    CompositionLocalProvider(com.pratitin.app.ui.motion.LocalAmbientClock provides if (reduceMotion) null else ambient) {
+    Box(
+        Modifier.fillMaxSize().background(LocalPalette.current.night)
+            .onSizeChanged { rootH = it.height }
+            .wakesAmbient(ambient),
+    ) {
         // Layer 1+2 — everything that glass bars and sheets look through
         Box(Modifier.fillMaxSize().backdropSource(content)) {
             // Layer 1 — the sky that cards look through
@@ -309,6 +332,7 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         AnimatedVisibility(visible = loveProfileOpen, enter = fadeIn(), exit = fadeOut()) {
             LoveProfileSheet(shell, onDismiss = { loveProfileOpen = false })
         }
+    }
     }
 }
 

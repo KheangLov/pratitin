@@ -164,7 +164,7 @@ fun GlassIconButton(backdrop: Backdrop?, onClick: () -> Unit, modifier: Modifier
     val interaction = remember { MutableInteractionSource() }
     val shape = remember(size) { SquircleShape(size / 2.2f) }
     Box(
-        modifier.size(size).pressScale(interaction, 0.88f).glass(backdrop, shape, liquid = true, cornerRadius = size / 2.2f).clip(shape)
+        modifier.size(size).pressScale(interaction, 0.88f).glass(backdrop, shape, cornerRadius = size / 2.2f).clip(shape)
             .clickable(interaction, indication = null, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Canvas(Modifier.size(size * 0.45f)) { icon(p.ink) } }

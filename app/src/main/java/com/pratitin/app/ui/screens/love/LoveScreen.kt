@@ -247,7 +247,7 @@ private fun WelcomeCard(shell: ShellState, today: Int, modifier: Modifier) {
     val lp = lovePalette()
     val km = LocalStrings.current.lang == Lang.KM
     val ctx = LocalContext.current
-    GlassCard(shell.bg, modifier.fillMaxWidth(), liquid = true, radius = 34.dp, tint = lp.cardTint) {
+    GlassCard(shell.bg, modifier.fillMaxWidth(), radius = 34.dp, tint = lp.cardTint) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             BeatingHeart(84.dp, onTap = { LoveSound.play(ctx, LoveSound.Sfx.TAP) })
             Text(if (km) "ចាប់ផ្ដើមរឿងស្នេហារបស់យើង" else "Begin our love story", style = HeritageType.title, color = p.ink, textAlign = TextAlign.Center)
@@ -284,10 +284,6 @@ private fun HeroCard(shell: ShellState, love: LoveData, a: Anniversary, today: I
     val ctx = LocalContext.current
     val future = a.date > today
     val days = kotlin.math.abs(Day.between(a.date, today))
-    // count up when the tab opens
-    val reduce = LocalReduceMotion.current
-    val shown = remember(a.id) { Animatable(if (reduce) days.toFloat() else 0f) }
-    LaunchedEffect(a.id, days) { shown.animateTo(days.toFloat(), tween(if (reduce) 0 else 1600, easing = FastOutSlowInEasing)) }
 
     GlassCard(shell.bg, modifier.fillMaxWidth(), liquid = true, radius = 36.dp, tint = lp.cardTint, padding = PaddingValues(0.dp)) {
         Box(Modifier.fillMaxWidth().drawBehind { drawAllCorners(lp.roseGold.copy(alpha = 0.6f), 22.dp.toPx()) }.padding(vertical = 18.dp, horizontal = 20.dp)) {
@@ -303,13 +299,7 @@ private fun HeroCard(shell: ShellState, love: LoveData, a: Anniversary, today: I
                 )
                 BeatingHeart(96.dp, onTap = { LoveSound.play(ctx, LoveSound.Sfx.TAP, love.profile.sound) })
                 Text(love.couple(km), style = HeritageType.title, color = p.ink, textAlign = TextAlign.Center, maxLines = 2)
-                Text(
-                    s.big(shown.value.toLong()),
-                    style = HeritageType.number.copy(
-                        brush = Brush.verticalGradient(listOf(lp.blush, lp.rose)), fontSize = 66.sp,
-                    ),
-                    maxLines = 1,
-                )
+                CountUp(a.id, days)
                 Text(
                     if (future) (if (km) "ថ្ងៃទៀត" else if (days == 1L) "day to go" else "days to go")
                     else if (a.kind == AnnivKind.PARTNER_BIRTHDAY) (if (km) "ថ្ងៃនៃជីវិតនាង" else "days of her life")
@@ -322,6 +312,21 @@ private fun HeroCard(shell: ShellState, love: LoveData, a: Anniversary, today: I
         }
         KbachDivider(Modifier.padding(horizontal = 26.dp).padding(bottom = 14.dp), height = 12.dp, color = lp.roseGold, alpha = 0.5f)
     }
+}
+
+/** The big day count, counting up when the tab opens. Its own scope: only this text recomposes per frame. */
+@Composable
+private fun CountUp(key: Long, days: Long) {
+    val s = LocalStrings.current
+    val lp = lovePalette()
+    val reduce = LocalReduceMotion.current
+    val shown = remember(key) { Animatable(if (reduce) days.toFloat() else 0f) }
+    LaunchedEffect(key, days) { shown.animateTo(days.toFloat(), tween(if (reduce) 0 else 1600, easing = FastOutSlowInEasing)) }
+    Text(
+        s.big(shown.value.toLong()),
+        style = HeritageType.number.copy(brush = Brush.verticalGradient(listOf(lp.blush, lp.rose)), fontSize = 66.sp),
+        maxLines = 1,
+    )
 }
 
 /** Years · months · days · h · m · s, ticking every second. */
@@ -674,7 +679,7 @@ fun TodayLoveCard(shell: ShellState, love: LoveData, today: Int, modifier: Modif
     GlassCard(shell.bg, modifier.fillMaxWidth(), tint = lp.cardTint, onClick = { shell.goTo(com.pratitin.app.ui.Tab.LOVE) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val beat = rememberHeartbeat()
-            Canvas(Modifier.size(46.dp).graphicsLayerScale { beat?.value ?: 1f }) {
+            Canvas(Modifier.size(46.dp).graphicsLayerScale { beat?.invoke() ?: 1f }) {
                 drawCircle(Brush.radialGradient(listOf(lp.glow.copy(alpha = 0.4f), Color.Transparent)), radius = size.width * 0.7f)
                 drawPath(
                     com.pratitin.app.ui.components.heartPath(Offset(size.width * 0.1f, size.height * 0.14f), size.width * 0.8f),

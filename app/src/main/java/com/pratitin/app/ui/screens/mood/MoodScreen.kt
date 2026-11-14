@@ -79,7 +79,7 @@ fun MoodScreen(shell: ShellState) {
             }
         }
         item(key = "today") {
-            GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(1), liquid = true) {
+            GlassCard(shell.bg, Modifier.fillMaxWidth().enterStagger(1)) {
                 SectionTitle(s.howFeel)
                 Spacer(Modifier.height(14.dp))
                 MoodPicker(moods[today]?.mood, onPick = { shell.vm.setMood(today, it, moods[today]?.note.orEmpty()) })

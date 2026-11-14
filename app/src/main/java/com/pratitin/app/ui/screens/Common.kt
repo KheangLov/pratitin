@@ -146,13 +146,16 @@ fun ScreenList(
             else (state.firstVisibleItemScrollOffset / 600f).coerceIn(0f, 1f)
         }.distinctUntilChanged().collect { shell.reportScroll(it) }
     }
-    LazyColumn(
-        state = state,
-        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 128.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        content = content,
-    )
+    val birth = remember { android.os.SystemClock.uptimeMillis() }
+    androidx.compose.runtime.CompositionLocalProvider(com.pratitin.app.ui.motion.LocalScreenBirth provides birth) {
+        LazyColumn(
+            state = state,
+            modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 128.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            content = content,
+        )
+    }
 }
 
 // ------------------------------------------------------------------ mood picker

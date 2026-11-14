@@ -6,10 +6,12 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.SoundPool
 import com.pratitin.app.R
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The Love tab's sound theme: a short-effect [SoundPool] and a looping music-box lullaby
@@ -73,6 +75,7 @@ object LoveSound {
 
     /** Plays [song], cross-fading if another song is playing. [force] ignores other apps' music (an explicit pick). */
     fun startMusic(ctx: Context, song: Song = current ?: Song.SERENADE, force: Boolean = false) {
+        wanted = true
         val am = ctx.getSystemService(AudioManager::class.java)
         musicVolume = song.volume
         if (current == song && player?.isPlaying == true) { fadeTo(musicVolume, 1400); return }
@@ -92,20 +95,37 @@ object LoveSound {
         }
         if (!force && am?.isMusicActive == true && player?.isPlaying != true) return // don't talk over the user's own music
         current = song
-        runCatching {
-            val mp = player ?: MediaPlayer.create(
-                ctx.applicationContext, song.res,
-                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build(),
-                am?.generateAudioSessionId() ?: 0,
-            )?.also { it.isLooping = true; player = it } ?: return
-            level = 0f
-            mp.setVolume(0f, 0f)
-            mp.start()
-            fadeTo(musicVolume, 2200)
+        val existing = player
+        if (existing != null) {
+            runCatching { level = 0f; existing.setVolume(0f, 0f); existing.start(); fadeTo(musicVolume, 2200) }
+            return
+        }
+        if (loading?.isActive == true) return
+        // Decoding/preparing a song takes tens of ms: do it off the main thread so opening
+        // the Love tab never hitches, then start on main.
+        val app = ctx.applicationContext
+        loading = main.launch {
+            val mp = withContext(Dispatchers.IO) {
+                runCatching {
+                    MediaPlayer.create(
+                        app, song.res,
+                        AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build(),
+                        am?.generateAudioSessionId() ?: 0,
+                    )
+                }.getOrNull()
+            } ?: return@launch
+            if (current != song || player != null || !wanted) { mp.release(); return@launch }
+            mp.isLooping = true
+            player = mp
+            runCatching { level = 0f; mp.setVolume(0f, 0f); mp.start(); fadeTo(musicVolume, 2200) }
         }
     }
+    private var loading: Job? = null
+    /** false after [stopMusic]: a song that finishes loading late must not start. */
+    private var wanted = false
 
     fun stopMusic(release: Boolean = false) {
+        wanted = false
         val mp = player ?: return
         fadeTo(0f, 700) {
             runCatching { if (mp.isPlaying) mp.pause() }

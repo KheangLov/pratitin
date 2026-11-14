@@ -49,27 +49,20 @@ import kotlin.random.Random
 @Composable
 fun HeritageSky(animate: Boolean, parallax: () -> Float, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
-    var time by remember { mutableFloatStateOf(17f) }
-    LaunchedEffect(animate) {
-        if (!animate) return@LaunchedEffect
-        var last = 0L
-        val start = withFrameMillis { it } - (time * 1000).toLong()
-        while (true) {
-            withFrameMillis { now ->
-                if (now - last >= 33) { time = (now - start) / 1000f; last = now }
-            }
-        }
-    }
+    val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
+    // Frozen at the last moment shown when not animating: the sky stops redrawing entirely.
+    val frozen = remember { floatArrayOf(17f) }
+    fun time(): Float = if (animate && clock != null) clock.time.also { frozen[0] = it } else frozen[0]
 
     Box(modifier.fillMaxSize()) {
         // ---- sky
-        if (CAN_REFRACT) AuroraShaderLayer(p) { time } else GradientSky(p) { time }
+        if (CAN_REFRACT) AuroraShaderLayer(p) { time() } else GradientSky(p) { time() }
 
         // ---- stars (dark theme only), drawn once into cache, twinkle via alpha
         if (p.isDark) {
             val stars = remember { List(70) { floatArrayOf(Random.nextFloat(), Random.nextFloat() * 0.62f, 0.4f + Random.nextFloat() * 1.4f, Random.nextFloat() * 6.28f) } }
             Canvas(Modifier.fillMaxSize()) {
-                val t = time
+                val t = time()
                 for (s in stars) {
                     val a = 0.35f + 0.65f * (0.5f + 0.5f * sin(t * 1.3f + s[3]))
                     drawCircle(p.moon.copy(alpha = a * 0.8f), s[2], Offset(s[0] * size.width, s[1] * size.height))

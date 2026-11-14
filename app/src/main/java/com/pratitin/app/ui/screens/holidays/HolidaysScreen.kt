@@ -198,7 +198,7 @@ private fun BreakCard(shell: ShellState, b: BreakSuggestion, today: Int, modifie
     }
     val publicDates = remember(publicHolidays) { publicHolidays.map { it.packed }.toSet() }
     val names = remember(publicHolidays, s) { publicHolidays.distinctBy { it.id }.joinToString(" · ") { it.title(s).substringBefore(" · ") } }
-    GlassCard(shell.bg, modifier, liquid = true, onClick = { shell.openDay(b.startPacked, null) }) {
+    GlassCard(shell.bg, modifier, onClick = { shell.openDay(b.startPacked, null) }) {
         // Fixed-height card: headline, dates and timeline sit at the top, holiday names
         // are pinned to the bottom (max 2 lines), so every card in the row lines up.
         Text(s.takeLeave(b.leaveDays.size, b.totalDaysOff), style = HeritageType.heading, color = p.goldSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
