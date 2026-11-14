@@ -25,7 +25,20 @@ object LoveSound {
         CELEBRATE(R.raw.love_celebrate, 0.75f),
     }
 
-    private const val MUSIC_VOLUME = 0.32f
+    /** Original songs, rendered by tools/make_love_songs.py and make_love_sounds.py. */
+    enum class Song(val res: Int, val emoji: String, val km: String, val en: String, val kmBlurb: String, val enBlurb: String, val volume: Float) {
+        SERENADE(R.raw.love_song_serenade, "🎹", "ភ្លេងព្យ៉ាណូស្នេហា", "Piano Serenade", "វ៉ាល់ព្យ៉ាណូយឺតៗ និងវីយូឡុង", "A slow piano waltz with warm strings", 0.42f),
+        MOONLIGHT(R.raw.love_song_moonlight, "🌕", "ពន្លឺចន្ទលើគូទឹក", "Moonlight on the Moat", "ឃឹម ខ្លុយ និងស្គរដូចចង្វាក់បេះដូង", "Khim, bamboo flute and a heartbeat skor", 0.42f),
+        FOREVER(R.raw.love_song_forever, "🎻", "ជារៀងរហូត", "Forever", "វីយូឡុង ពិណ និងខ្លុយ", "A strings, harp and flute ballad", 0.38f),
+        MUSIC_BOX(R.raw.love_song_musicbox, "🎠", "ប្រអប់តន្ត្រី", "Music Box", "ចម្រៀងបំពេរយប់ទន់ភ្លន់", "A gentle music-box lullaby", 0.36f);
+
+        companion object {
+            fun of(key: String) = entries.firstOrNull { it.name == key } ?: SERENADE
+        }
+    }
+
+    private var current: Song? = null
+    private var musicVolume = 0.4f
     private val main = MainScope()
     private var pool: SoundPool? = null
     private val ids = HashMap<Sfx, Int>()
@@ -58,20 +71,37 @@ object LoveSound {
         if (id in ready) pool?.play(id, sfx.volume, sfx.volume, 1, 0, 1f)
     }
 
-    fun startMusic(ctx: Context) {
+    /** Plays [song], cross-fading if another song is playing. [force] ignores other apps' music (an explicit pick). */
+    fun startMusic(ctx: Context, song: Song = current ?: Song.SERENADE, force: Boolean = false) {
         val am = ctx.getSystemService(AudioManager::class.java)
-        if (player?.isPlaying == true) { fadeTo(MUSIC_VOLUME, 1400); return }
-        if (am?.isMusicActive == true) return // don't talk over the user's own music
+        musicVolume = song.volume
+        if (current == song && player?.isPlaying == true) { fadeTo(musicVolume, 1400); return }
+        if (current != song && player != null) {
+            // swap songs: fade the old one out, then start the new one
+            val old = player!!
+            player = null
+            fade?.cancel()
+            fade = main.launch {
+                val from = level
+                for (i in 1..12) { level = from * (1f - i / 12f); runCatching { old.setVolume(level, level) }; delay(30) }
+                runCatching { old.stop(); old.release() }
+                current = song
+                startMusic(ctx, song, force = true)
+            }
+            return
+        }
+        if (!force && am?.isMusicActive == true && player?.isPlaying != true) return // don't talk over the user's own music
+        current = song
         runCatching {
             val mp = player ?: MediaPlayer.create(
-                ctx.applicationContext, R.raw.love_music,
+                ctx.applicationContext, song.res,
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build(),
                 am?.generateAudioSessionId() ?: 0,
             )?.also { it.isLooping = true; player = it } ?: return
             level = 0f
             mp.setVolume(0f, 0f)
             mp.start()
-            fadeTo(MUSIC_VOLUME, 2200)
+            fadeTo(musicVolume, 2200)
         }
     }
 

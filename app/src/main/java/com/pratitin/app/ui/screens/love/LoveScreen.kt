@@ -110,11 +110,14 @@ private fun LoveMusic(profile: LoveProfile) {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val music by rememberUpdatedState(profile.music)
+    val song by rememberUpdatedState(LoveSound.Song.of(profile.song))
     LaunchedEffect(Unit) { LoveSound.preload(ctx) }
+    // switching songs while the tab is open cross-fades straight to the new one
+    LaunchedEffect(profile.song) { if (profile.music && owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) LoveSound.startMusic(ctx, song, force = true) }
     DisposableEffect(owner, profile.music) {
         val obs = LifecycleEventObserver { _, e ->
             when (e) {
-                Lifecycle.Event.ON_RESUME -> if (music) LoveSound.startMusic(ctx)
+                Lifecycle.Event.ON_RESUME -> if (music) LoveSound.startMusic(ctx, song)
                 Lifecycle.Event.ON_PAUSE -> LoveSound.stopMusic()
                 else -> {}
             }
@@ -150,6 +153,18 @@ fun LoveScreen(shell: ShellState) {
                     Column(Modifier.weight(1f)) {
                         Text(if (km) "ស្នេហារបស់យើង" else "Our Love", style = HeritageType.display.copy(fontSize = 30.sp), color = p.ink, maxLines = 1)
                         Text(love.couple(km), style = HeritageType.label, color = lp.blush, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // now playing — tap for the next song
+                        val song = LoveSound.Song.of(love.profile.song)
+                        Text(
+                            "${song.emoji} ${if (km) song.km else song.en}  ⏭",
+                            style = HeritageType.micro, color = p.ink, maxLines = 1,
+                            modifier = Modifier.padding(top = 4.dp).clip(Squircles.pill).background(lp.rose.copy(alpha = 0.18f))
+                                .clickable {
+                                    val next = LoveSound.Song.entries[(song.ordinal + 1) % LoveSound.Song.entries.size]
+                                    shell.vm.updateLove { it.copy(song = next.name, music = true) }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
                     }
                     GlassIconButton(shell.bg, onClick = {
                         val on = !(love.profile.sound || love.profile.music)

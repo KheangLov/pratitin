@@ -70,6 +70,8 @@ data class LoveProfile(
     val featuredId: Long = 0,
     val sound: Boolean = true,
     val music: Boolean = true,
+    /** key of [com.pratitin.app.audio.LoveSound.Song] */
+    val song: String = "SERENADE",
 )
 
 @Immutable
@@ -124,7 +126,7 @@ class LoveStore(context: Context, private val scope: CoroutineScope, private val
     private suspend fun save(d: LoveData) = withContext(Dispatchers.IO) {
         val o = JSONObject()
         o.put("you", d.profile.you); o.put("partner", d.profile.partner); o.put("featured", d.profile.featuredId)
-        o.put("sound", d.profile.sound); o.put("music", d.profile.music)
+        o.put("sound", d.profile.sound); o.put("music", d.profile.music); o.put("song", d.profile.song)
         val arr = JSONArray()
         d.items.forEach { a ->
             arr.put(JSONObject().apply {
@@ -147,6 +149,7 @@ class LoveStore(context: Context, private val scope: CoroutineScope, private val
                 profile = LoveProfile(
                     you = o.optString("you"), partner = o.optString("partner"), featuredId = o.optLong("featured", 0),
                     sound = o.optBoolean("sound", true), music = o.optBoolean("music", true),
+                    song = o.optString("song", "SERENADE").ifBlank { "SERENADE" },
                 ),
                 items = List(arr.length()) { i ->
                     val a = arr.getJSONObject(i)

@@ -315,8 +315,28 @@ fun LoveProfileSheet(shell: ShellState, onDismiss: () -> Unit) {
                 LoveField(partner, if (km) "ឈ្មោះភរិយា" else "Your wife's name", singleLine = true, big = true) { partner = it }
 
                 Spacer(Modifier.height(8.dp))
-                SettingRow(if (km) "🎵 តន្ត្រីស្នេហា (ប្រអប់តន្ត្រី)" else "🎵 Romantic music-box theme") {
+                SettingRow(if (km) "🎵 តន្ត្រីស្នេហា" else "🎵 Romantic music") {
                     LiquidToggle(love.profile.music, { v -> shell.vm.updateLove { it.copy(music = v) } })
+                }
+                // song picker
+                LoveSound.Song.entries.forEach { song ->
+                    val sel = love.profile.song == song.name
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(Squircles.m)
+                            .background(if (sel) Brush.horizontalGradient(listOf(lp.rose.copy(alpha = 0.45f), lp.wine.copy(alpha = 0.35f))) else Brush.horizontalGradient(listOf(lp.rose.copy(alpha = 0.08f), lp.rose.copy(alpha = 0.08f))))
+                            .border(1.dp, if (sel) lp.roseGold.copy(alpha = 0.7f) else Color.Transparent, Squircles.m)
+                            .clickable { shell.vm.updateLove { it.copy(song = song.name, music = true) } }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(song.emoji, fontSize = 22.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(if (km) song.km else song.en, style = HeritageType.heading.copy(fontSize = 15.sp), color = p.ink)
+                            Text(if (km) song.kmBlurb else song.enBlurb, style = HeritageType.micro, color = p.inkSoft)
+                        }
+                        if (sel) Text(if (love.profile.music) "♪" else "✓", style = HeritageType.heading, color = lp.blush)
+                    }
                 }
                 SettingRow(if (km) "💓 សំឡេងចុចបេះដូង" else "💓 Heartbeat & sparkle sounds") {
                     LiquidToggle(love.profile.sound, { v -> shell.vm.updateLove { it.copy(sound = v) }; if (v) LoveSound.play(ctx, LoveSound.Sfx.TAP) })
