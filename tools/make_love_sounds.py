@@ -1,7 +1,7 @@
 """
 Synthesises the Love tab's sound theme (all original, generated from scratch):
 
-  love_song_musicbox.ogg  32 s seamless music-box lullaby in F major (8 bars, 60 bpm) over a soft pad
+  (songs are rendered by make_love_songs.py)
   love_tap.ogg        double heartbeat + sparkle, for tapping the heart
   love_chime.ogg      bell arpeggio, used as the anniversary notification sound
   love_celebrate.ogg  shimmering ascending glissando, for saving and milestones
@@ -196,7 +196,6 @@ def celebrate():
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "app/src/main/res/raw"
     os.makedirs(out, exist_ok=True)
-    save("love_song_musicbox.ogg", lullaby(), out, quality=3)
     save("love_tap.ogg", tap(), out)
     save("love_chime.ogg", chime(), out)
     save("love_celebrate.ogg", celebrate(), out)

@@ -320,7 +320,7 @@ fun LoveProfileSheet(shell: ShellState, onDismiss: () -> Unit) {
                 }
                 // song picker
                 LoveSound.Song.entries.forEach { song ->
-                    val sel = love.profile.song == song.name
+                    val sel = LoveSound.Song.of(love.profile.song) == song
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(Squircles.m)
                             .background(if (sel) Brush.horizontalGradient(listOf(lp.rose.copy(alpha = 0.45f), lp.wine.copy(alpha = 0.35f))) else Brush.horizontalGradient(listOf(lp.rose.copy(alpha = 0.08f), lp.rose.copy(alpha = 0.08f))))

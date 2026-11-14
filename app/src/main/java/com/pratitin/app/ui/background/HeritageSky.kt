@@ -112,23 +112,37 @@ private class AuroraShader {
     fun brush(w: Float, h: Float, p: HeritagePalette): Brush {
         shader.setFloatUniform("size", w, h)
         fun set(name: String, c: Color) = shader.setFloatUniform(name, c.red, c.green, c.blue, 1f)
-        set("c0", p.night); set("c1", p.lacquerDeep); set("c2", p.gold); set("c3", if (p.isDark) p.jade else p.lotus)
+        val c = FlagSky.of(p)
+        set("c0", c.deep); set("c1", c.royal); set("c2", c.crimson); set("c3", c.light)
         return brush
     }
 
     fun setTime(t: Float) = shader.setFloatUniform("time", t)
 }
 
-/** Fallback sky for Android 8–12: three drifting radial glows over a vertical gradient. */
+/**
+ * Sky colours inspired by the Cambodian flag: royal blue overhead, a crimson glow on the
+ * horizon behind the (white) temple.
+ */
+private class FlagSky(val deep: Color, val royal: Color, val crimson: Color, val light: Color) {
+    companion object {
+        private val DUSK = FlagSky(Color(0xFF050F3E), Color(0xFF0B2C96), Color(0xFFC8102E), Color(0xFF7FA6FF))
+        private val DAY = FlagSky(Color(0xFF2F62D6), Color(0xFF5E8EF0), Color(0xFFE8394B), Color(0xFFFFFFFF))
+        fun of(p: HeritagePalette) = if (p.isDark) DUSK else DAY
+    }
+}
+
+/** Fallback sky for Android 8–12: drifting radial glows over a royal-blue gradient. */
 @Composable
 private fun GradientSky(p: HeritagePalette, time: () -> Float) {
+    val c = FlagSky.of(p)
     Canvas(Modifier.fillMaxSize()) {
-        drawRect(Brush.verticalGradient(listOf(p.nightDeep, p.night, p.lacquerDeep)))
+        drawRect(Brush.verticalGradient(listOf(c.deep, c.royal, c.deep)))
         val t = time()
         val glows = listOf(
-            Triple(Offset(size.width * (0.2f + 0.08f * sin(t * 0.11f)), size.height * 0.25f), p.lacquer, 0.55f),
-            Triple(Offset(size.width * (0.85f + 0.06f * sin(t * 0.07f + 1f)), size.height * 0.45f), p.lotus, 0.18f),
-            Triple(Offset(size.width * 0.5f, size.height * 0.92f), p.gold, 0.35f),
+            Triple(Offset(size.width * (0.2f + 0.08f * sin(t * 0.11f)), size.height * 0.25f), c.light, 0.22f),
+            Triple(Offset(size.width * (0.85f + 0.06f * sin(t * 0.07f + 1f)), size.height * 0.45f), c.royal, 0.4f),
+            Triple(Offset(size.width * 0.5f, size.height * 0.92f), c.crimson, 0.4f),
         )
         for ((c, col, a) in glows) {
             drawCircle(Brush.radialGradient(listOf(col.copy(alpha = a), Color.Transparent), c, size.maxDimension * 0.55f), size.maxDimension * 0.55f, c)

@@ -1,4 +1,6 @@
 """
+SUPERSEDED by render_flag_angkor.py (the modern, flag-inspired scene now in the app).
+
 Procedural Angkor Wat scene for Pratitin.
 
 Renders the west facade of Angkor Wat at the reflecting pool — five lotus-bud towers in

@@ -71,7 +71,7 @@ data class LoveProfile(
     val sound: Boolean = true,
     val music: Boolean = true,
     /** key of [com.pratitin.app.audio.LoveSound.Song] */
-    val song: String = "SERENADE",
+    val song: String = "STILL_YOU",
 )
 
 @Immutable
@@ -149,7 +149,7 @@ class LoveStore(context: Context, private val scope: CoroutineScope, private val
                 profile = LoveProfile(
                     you = o.optString("you"), partner = o.optString("partner"), featuredId = o.optLong("featured", 0),
                     sound = o.optBoolean("sound", true), music = o.optBoolean("music", true),
-                    song = o.optString("song", "SERENADE").ifBlank { "SERENADE" },
+                    song = o.optString("song", "STILL_YOU").ifBlank { "STILL_YOU" },
                 ),
                 items = List(arr.length()) { i ->
                     val a = arr.getJSONObject(i)

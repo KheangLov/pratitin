@@ -29,13 +29,13 @@ object LoveSound {
 
     /** Original songs, rendered by tools/make_love_songs.py and make_love_sounds.py. */
     enum class Song(val res: Int, val emoji: String, val km: String, val en: String, val kmBlurb: String, val enBlurb: String, val volume: Float) {
-        SERENADE(R.raw.love_song_serenade, "🎹", "ភ្លេងព្យ៉ាណូស្នេហា", "Piano Serenade", "វ៉ាល់ព្យ៉ាណូយឺតៗ និងវីយូឡុង", "A slow piano waltz with warm strings", 0.42f),
-        MOONLIGHT(R.raw.love_song_moonlight, "🌕", "ពន្លឺចន្ទលើគូទឹក", "Moonlight on the Moat", "ឃឹម ខ្លុយ និងស្គរដូចចង្វាក់បេះដូង", "Khim, bamboo flute and a heartbeat skor", 0.42f),
-        FOREVER(R.raw.love_song_forever, "🎻", "ជារៀងរហូត", "Forever", "វីយូឡុង ពិណ និងខ្លុយ", "A strings, harp and flute ballad", 0.38f),
-        MUSIC_BOX(R.raw.love_song_musicbox, "🎠", "ប្រអប់តន្ត្រី", "Music Box", "ចម្រៀងបំពេរយប់ទន់ភ្លន់", "A gentle music-box lullaby", 0.36f);
+        STILL_YOU(R.raw.love_song_stillyou, "💞", "នៅតែជាអូន", "Still You", "បទស្នេហាស៊ូល ព្យ៉ាណូអគ្គិសនី និងចង្វាក់ទន់ៗ", "A neo-soul love ballad: Rhodes, vibraphone, soft brushes", 0.46f),
+        SLOW_DANCE(R.raw.love_song_slowdance, "🕯️", "រាំយឺតៗក្នុងផ្ទះបាយ", "Slow Dance in the Kitchen", "Lo-fi ស្រាលៗ សំឡេងថាសចាស់ៗ", "Lo-fi Rhodes, a lazy beat and vinyl crackle", 0.46f),
+        OUR_HOME(R.raw.love_song_ourhome, "🏡", "ផ្ទះតូចរបស់យើង", "Our Little Home", "ហ្គីតាទន់ៗ និងខ្សឹបហួច", "Fingerpicked guitar and a whistled tune", 0.44f),
+        MOONLIGHT(R.raw.love_song_moonlight, "🌕", "ពន្លឺចន្ទលើគូទឹក", "Moonlight on the Moat", "ឃឹម ខ្លុយ និងស្គរដូចចង្វាក់បេះដូង", "Khim, bamboo flute and a heartbeat skor", 0.44f);
 
         companion object {
-            fun of(key: String) = entries.firstOrNull { it.name == key } ?: SERENADE
+            fun of(key: String) = entries.firstOrNull { it.name == key } ?: STILL_YOU
         }
     }
 
@@ -74,7 +74,7 @@ object LoveSound {
     }
 
     /** Plays [song], cross-fading if another song is playing. [force] ignores other apps' music (an explicit pick). */
-    fun startMusic(ctx: Context, song: Song = current ?: Song.SERENADE, force: Boolean = false) {
+    fun startMusic(ctx: Context, song: Song = current ?: Song.STILL_YOU, force: Boolean = false) {
         wanted = true
         val am = ctx.getSystemService(AudioManager::class.java)
         musicVolume = song.volume

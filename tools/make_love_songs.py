@@ -1,13 +1,12 @@
 """
-Composes and renders the Love tab's romantic songs (all original, synthesised from scratch,
-stereo, each a seamless loop):
+Composes and renders the Love tab's songs — warm, intimate love songs for a couple who
+have been together for years (all original, synthesised from scratch, stereo, seamless loops):
 
-  love_song_serenade.ogg   "Piano Serenade"      slow 3/4 piano waltz in C over warm strings (66 bpm, 16 bars)
-  love_song_moonlight.ogg  "Moonlight on the Moat" Khmer-flavoured pentatonic love song: khim tremolo,
-                                                   bamboo-flute lead, soft skor heartbeat (70 bpm, 12 bars)
-  love_song_forever.ogg    "Forever"             strings & harp ballad in D with a flute melody (64 bpm, 12 bars)
-
-The music-box lullaby (love_song_musicbox.ogg) and the effects come from make_love_sounds.py.
+  love_song_stillyou.ogg   "Still You"                 neo-soul ballad: Rhodes, jazzy chords, vibraphone tune,
+                                                       warm bass, soft brushed beat (70 bpm, 16 bars)
+  love_song_slowdance.ogg  "Slow Dance in the Kitchen" lo-fi: dusty Rhodes, swung boom-bap, vinyl crackle (76 bpm)
+  love_song_ourhome.ogg    "Our Little Home"           acoustic: Travis-picked nylon guitar, whistled melody (84 bpm)
+  love_song_moonlight.ogg  "Moonlight on the Moat"     Khmer-flavoured: khim tremolo, bamboo flute, heartbeat skor
 
 Usage:  python3 tools/make_love_songs.py app/src/main/res/raw
 Needs numpy, scipy and ffmpeg (libvorbis).
@@ -201,7 +200,7 @@ def hall_ir(seed, seconds=3.6, decay=2.4):
 IR_L, IR_R = hall_ir(1), hall_ir(2)
 
 
-def finish(mix, loop_seconds, wet=0.55):
+def finish(mix, loop_seconds, wet=0.55, lp=12000):
     """Reverb, fold the tail back over the loop start, master, return stereo array."""
     L = mix.L + wet * fftconvolve(mix.sL, IR_L)[: mix.n]
     R = mix.R + wet * fftconvolve(mix.sR, IR_R)[: mix.n]
@@ -214,12 +213,12 @@ def finish(mix, loop_seconds, wet=0.55):
         out.append(loop)
     x = np.stack(out, axis=1)
     # gentle warmth: tame harsh highs, light bus glue, soft limit
-    x = np.stack([lowpass(x[:, 0], 12000), lowpass(x[:, 1], 12000)], axis=1)
+    x = np.stack([lowpass(x[:, 0], lp), lowpass(x[:, 1], lp)], axis=1)
     # same loudness for every song (-17 dBFS RMS), never above -1 dBFS peak
     rms = np.sqrt(np.mean(x ** 2))
-    x = x * (10 ** (-17 / 20) / (rms + 1e-9))
+    x = x * (10 ** (-18 / 20) / (rms + 1e-9))
     peak = np.max(np.abs(x))
-    return x * (0.89 / peak) if peak > 0.89 else x
+    return x * (0.78 / peak) if peak > 0.78 else x  # headroom: Vorbis overshoots on transients
 
 
 def save(name, x, outdir, q=4):
@@ -235,77 +234,6 @@ def save(name, x, outdir, q=4):
 def hum(t, amt=0.012):
     """Humanised timing."""
     return t + rng.uniform(-amt, amt)
-
-
-# ================================================================== 1. Piano Serenade
-
-def serenade():
-    bpm = 66.0; beat = 60 / bpm; bar = 3 * beat
-    bars = 16
-    length = bars * bar
-    mix = Mix(length)
-    # chord: (bass, [waltz chord tones], [string pad])
-    chords = [
-        ("C3", ["E4", "G4", "C5"], ["C4", "E4", "G4"]),
-        ("A2", ["E4", "A4", "C5"], ["A3", "C4", "E4"]),
-        ("F2", ["F4", "A4", "C5"], ["F3", "A3", "C4"]),
-        ("G2", ["D4", "G4", "B4"], ["G3", "B3", "D4"]),
-        ("C3", ["E4", "G4", "C5"], ["C4", "E4", "G4"]),
-        ("E2", ["E4", "G4", "B4"], ["E3", "G3", "B3"]),
-        ("F2", ["F4", "A4", "C5"], ["F3", "A3", "C4"]),
-        ("G2", ["D4", "F4", "B4"], ["G3", "B3", "F4"]),
-        ("A2", ["E4", "A4", "C5"], ["A3", "C4", "E4"]),
-        ("E2", ["E4", "G4", "B4"], ["E3", "G3", "B3"]),
-        ("F2", ["F4", "A4", "C5"], ["F3", "A3", "C4"]),
-        ("C3", ["E4", "G4", "C5"], ["C4", "E4", "G4"]),
-        ("D3", ["D4", "F4", "C5"], ["D3", "F3", "A3", "C4"]),
-        ("G2", ["D4", "G4", "B4"], ["G3", "B3", "D4"]),
-        ("C3", ["E4", "G4", "C5"], ["C4", "E4", "G4"]),
-        ("G2", ["D4", "F4", "B4"], ["G3", "B3", "D4", "F4"]),
-    ]
-    # melody per bar: (note, beats); None = rest
-    melody = [
-        [("G4", 1), ("C5", 1), ("E5", 1)],
-        [("E5", 2), ("D5", 1)],
-        [("C5", 1), ("A4", 1), ("C5", 1)],
-        [("D5", 3)],
-        [("E5", 1), ("G5", 1), ("C6", 1)],
-        [("B5", 2), ("G5", 1)],
-        [("A5", 1.5), ("G5", 0.5), ("F5", 1)],
-        [("G5", 2.5), ("F5", 0.5)],
-        [("E5", 1), ("A5", 1), ("C6", 1)],
-        [("B5", 1.5), ("A5", 0.5), ("G5", 1)],
-        [("A5", 1), ("G5", 1), ("F5", 1)],
-        [("E5", 2), ("C5", 1)],
-        [("D5", 1), ("F5", 1), ("A5", 1)],
-        [("G5", 1.5), ("F5", 0.5), ("D5", 1)],
-        [("C5", 3)],
-        [("D5", 2), ("B4", 1)],
-    ]
-    for b in range(bars):
-        t0 = b * bar
-        bass, tones, pad = chords[b]
-        # left hand: low bass on 1 (with octave below for warmth), chord on 2 and 3
-        mix.add(piano(hz(bass), bar * 0.95, 0.62), hum(t0), pan=-0.35, send=0.35)
-        mix.add(piano(hz(m(bass) - 12), bar * 0.95, 0.35), hum(t0), pan=-0.4, send=0.35)
-        for k in (1, 2):
-            for i, n in enumerate(tones):
-                mix.add(piano(hz(n), beat * 0.9, 0.34 - 0.04 * (k - 1)), hum(t0 + k * beat + i * 0.008), pan=-0.05 + 0.08 * i, send=0.35)
-        # right hand melody with an octave-doubled sparkle on long notes
-        t = t0
-        for n, beats in melody[b]:
-            v = 0.78 if beats >= 1.5 else 0.68
-            # phrase shaping: lift towards the climax (bars 9–10)
-            v *= 0.9 + 0.12 * np.exp(-((b - 9.0) / 3.5) ** 2)
-            mix.add(piano(hz(n), beats * beat * 0.98, v, ring=2.2), hum(t, 0.008), pan=0.25, send=0.4)
-            t += beats * beat
-        # strings, entering softly on the second half
-        amp = 0.018 if b < 8 else 0.03
-        mix.add(strings([hz(n) for n in pad], bar + 0.3, amp, attack=0.45), t0 - 0.3, pan=0.0, send=0.55)
-        # cello line under the second half
-        if b >= 8:
-            mix.add(strings([hz(bass)], bar + 0.2, 0.018, attack=0.6, bright=1400), t0, pan=-0.2, send=0.45)
-    return finish(mix, length)
 
 
 # ================================================================== 2. Moonlight on the Moat (Khmer-flavoured)
@@ -361,54 +289,330 @@ def moonlight():
     return finish(mix, length, wet=0.6)
 
 
-# ================================================================== 3. Forever (strings & harp ballad)
+# ================================================================== more instruments
 
-def forever():
-    bpm = 64.0; beat = 60 / bpm; bar = 4 * beat
-    bars = 12
+from scipy.signal import lfilter
+
+
+def highpass(x, f, order=2):
+    return sosfilt(butter(order, f, "high", fs=SR, output="sos"), x)
+
+
+def rhodes(freq, dur, vel=0.55, ring=1.0, wow=0.0):
+    """FM electric piano: 1:1 modulator for the warm bark, a fast-decaying tine 'ping'."""
+    total = dur + ring
+    t = np.arange(int(total * SR)) / SR
+    f = freq * (1 + wow * np.sin(2 * np.pi * 0.55 * t + rng.uniform(0, 6)))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    idx = (0.5 + 1.9 * vel) * np.exp(-t * 4.0) + 0.3
+    tone = np.sin(ph + idx * np.sin(ph))
+    tine = np.sin(2 * np.pi * freq * 13.0 * t) * np.exp(-t * 38) * 0.16 * vel if freq * 13 < 15000 else 0
+    tau = 2.3 * (261.6 / freq) ** 0.4
+    env = 0.35 * np.exp(-t / (tau * 0.18)) + 0.65 * np.exp(-t / tau)
+    damper = np.where(t < dur, 1.0, np.exp(-(t - dur) / 0.12))
+    return (tone * env + tine) * np.minimum(1.0, t / 0.003) * damper * vel * 0.5
+
+
+def vibes(freq, dur, vel=0.5, ring=1.6, motor=True):
+    t = np.arange(int((dur + ring) * SR)) / SR
+    ph = 2 * np.pi * freq * t
+    idx = 0.9 * np.exp(-t * 9)
+    tone = np.sin(ph + idx * np.sin(4 * ph)) + 0.07 * np.sin(4 * ph) * np.exp(-t * 5)
+    env = np.exp(-t / 2.4) * np.minimum(1.0, t / 0.002)
+    trem = 1 - 0.26 * (0.5 + 0.5 * np.sin(2 * np.pi * 5.4 * t)) if motor else 1.0
+    damper = np.where(t < dur + 0.25, 1.0, np.exp(-(t - dur - 0.25) / 0.25))
+    return tone * env * trem * damper * vel * 0.4
+
+
+def ebass(freq, dur, vel=0.7):
+    t = np.arange(int((dur + 0.15) * SR)) / SR
+    ph = 2 * np.pi * freq * t
+    tone = np.sin(ph) + 0.35 * np.sin(2 * ph) + 0.1 * np.sin(3 * ph)
+    env = np.minimum(1.0, t / 0.006) * (0.55 * np.exp(-t / 0.25) + 0.45 * np.exp(-t / 1.8)) * np.where(t < dur, 1.0, np.exp(-(t - dur) / 0.04))
+    return lowpass(tone * env, 800) * vel * 0.5
+
+
+def _t(d):
+    return np.arange(int(d * SR)) / SR
+
+
+def kick(amp=0.6):
+    t = _t(0.45)
+    f = 48 + 70 * np.exp(-t * 28)
+    body = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 7.5)
+    click = highpass(rng.standard_normal(len(t)), 2000) * np.exp(-t * 300) * 0.12
+    return (body + click) * amp
+
+
+def rim(amp=0.2):
+    t = _t(0.08)
+    return (np.sin(2 * np.pi * 1700 * t) * np.exp(-t * 90) * 0.5 + bandpass(rng.standard_normal(len(t)), 2000, 6000) * np.exp(-t * 120)) * amp
+
+
+def snare(amp=0.3, lofi=False):
+    t = _t(0.3)
+    x = bandpass(rng.standard_normal(len(t)), 1200, 7000) * np.exp(-t * 16) + np.sin(2 * np.pi * 185 * t) * np.exp(-t * 30) * 0.5
+    return (lowpass(x, 4200) if lofi else x) * amp
+
+
+def hat(amp=0.1):
+    t = _t(0.06)
+    return highpass(rng.standard_normal(len(t)), 7000) * np.exp(-t * 70) * amp
+
+
+def shaker(amp=0.1):
+    t = _t(0.12)
+    return bandpass(rng.standard_normal(len(t)), 4500, 11000) * np.minimum(1.0, t / 0.02) * np.exp(-t * 28) * amp
+
+
+def brush(amp=0.06, d=0.35):
+    t = _t(d)
+    return bandpass(rng.standard_normal(len(t)), 2000, 9000) * np.sin(np.pi * t / d) ** 2 * amp
+
+
+def crackle(seconds, density=6.0, amp=0.05):
+    n = int(seconds * SR)
+    x = np.zeros(n)
+    k = rng.poisson(density * seconds)
+    pos = rng.integers(0, n, k)
+    x[pos] = rng.choice([-1, 1], k) * rng.uniform(0.15, 1, k) ** 3
+    hiss = lowpass(highpass(rng.standard_normal(n), 900), 6000) * 0.004
+    return highpass(x, 1500) * amp + hiss
+
+
+def whistle_line(notes, total, amp=0.16):
+    """A whistled melody: one continuous tone gliding between notes, per-note swells."""
+    n = int(total * SR)
+    f = np.zeros(n); a = np.zeros(n)
+    for st, du, fr in notes:
+        i0, i1 = int(st * SR), min(n, int((st + du) * SR))
+        f[i0:i1] = fr
+        L = i1 - i0
+        tt = np.arange(L) / SR
+        env = np.minimum(1.0, tt / 0.045) * np.minimum(1.0, (du - tt) / 0.07) * (0.92 + 0.08 * np.minimum(1.0, tt / max(du, 0.1)))
+        a[i0:i1] = np.maximum(a[i0:i1], env)
+    # hold pitch through rests, glide ~35 ms between notes
+    last = f[np.nonzero(f)[0][0]] if np.any(f) else 440.0
+    for i in range(n):
+        if f[i] == 0: f[i] = last
+        else: last = f[i]
+    k = np.exp(-1 / (0.035 * SR))
+    logf = lfilter([1 - k], [1, -k], np.log(f), zi=[np.log(f[0]) * k])[0]
+    t = np.arange(n) / SR
+    vib = 1 + 0.0055 * np.sin(2 * np.pi * 5.6 * t)
+    ph = 2 * np.pi * np.cumsum(np.exp(logf) * vib) / SR
+    tone = np.sin(ph) + 0.03 * np.sin(2 * ph)
+    breath = bandpass(rng.standard_normal(n), 1800, 5200) * 0.025
+    return (tone + breath) * lowpass(a, 40) * amp
+
+
+def nylon(freq, dur, amp=0.25):
+    x = pluck(freq, dur, amp, bright=0.28, decay=0.9975)
+    return x + 0.35 * bandpass(x, 90, 260)
+
+
+def swing(i, beat, ratio):
+    """Time of the i-th eighth note with swing (0.5 = straight)."""
+    return (i // 2) * beat + (i % 2) * beat * ratio
+
+
+def add_pan_lfo(mix, sig, at, rate=0.7, depth=0.55, send=0.3):
+    """Stereo tremolo/autopan, phase-locked to song time (Rhodes signature)."""
+    if at < 0: at += mix.loop
+    i = int(round(at * SR))
+    ph = 2 * np.pi * rate * (np.arange(len(sig)) + i) / SR
+    gl = np.sqrt(0.5 * (1 + depth * np.sin(ph))); gr = np.sqrt(0.5 * (1 - depth * np.sin(ph)))
+    for arr, g, s_arr in ((mix.L, gl, mix.sL), (mix.R, gr, mix.sR)):
+        place(arr, sig * g, at); place(s_arr, sig * g * send, at)
+
+
+# ================================================================== 1. Still You (neo-soul love ballad)
+
+def still_you():
+    bpm = 70.0; beat = 60 / bpm; bar = 4 * beat
+    V = {
+        "Fmaj9": ["A3", "C4", "E4", "G4"], "Em7": ["G3", "B3", "D4", "E4"], "A7b13": ["G3", "C#4", "F4"],
+        "Dm9": ["F3", "A3", "C4", "E4"], "G13": ["F3", "B3", "E4", "A4"], "G7sus": ["F3", "C4", "D4", "G4"],
+        "Cmaj9": ["E3", "G3", "B3", "D4"], "Am9": ["G3", "B3", "C4", "E4"],
+    }
+    R = {"Fmaj9": "F2", "Em7": "E2", "A7b13": "A2", "Dm9": "D2", "G13": "G2", "G7sus": "G2", "Cmaj9": "C2", "Am9": "A2"}
+    A = [[("Fmaj9", 0, 4)], [("Em7", 0, 2), ("A7b13", 2, 2)], [("Dm9", 0, 4)], [("G13", 0, 4)],
+         [("Em7", 0, 4)], [("A7b13", 0, 4)], [("Dm9", 0, 4)], [("G7sus", 0, 2), ("G13", 2, 2)]]
+    B = A[:4] + [[("Cmaj9", 0, 4)], [("Am9", 0, 4)], [("Dm9", 0, 2), ("G13", 2, 2)], [("Cmaj9", 0, 4)]]
+    prog = A + B
+    melody = [
+        [(None, 1), ("E5", .5), ("G5", .5), ("A5", 1.5), ("G5", .5)],
+        [("G5", 1), ("E5", 1), ("F5", 1), ("E5", 1)],
+        [("D5", .5), ("E5", .5), ("F5", 1), ("A5", 1.5), ("C6", .5)],
+        [("B5", 2), ("A5", 1), ("G5", 1)],
+        [("G5", 1), ("B5", 1), ("D6", 1), ("B5", 1)],
+        [("C#6", 1.5), ("B5", .5), ("A5", 2)],
+        [("F5", 1), ("A5", 1), ("C6", 1), ("E6", 1)],
+        [("D6", 2), ("C6", 1), ("B5", 1)],
+        [("A5", 1.5), ("G5", .5), ("E5", 1), ("C5", 1)],
+        [("D5", 1), ("E5", 1), ("G5", 1), ("F5", 1)],
+        [("E5", 2), ("D5", 1), ("C5", 1)],
+        [("D5", 3), (None, 1)],
+        [("E5", 1), ("G5", 1), ("B5", 1), ("D6", 1)],
+        [("C6", 1.5), ("B5", .5), ("A5", 1), ("G5", 1)],
+        [("F5", 1), ("A5", 1), ("B5", 1), ("A5", 1)],
+        [("G5", 3), (None, 1)],
+    ]
+    bars = 16
     length = bars * bar
     mix = Mix(length)
-    prog = [  # D  A/C#  Bm  F#m/A  G  D/F#  Em  A ... then  G  A  Bm  A(sus)
-        ("D3", ["D4", "F#4", "A4"]), ("C#3", ["C#4", "E4", "A4"]), ("B2", ["B3", "D4", "F#4"]), ("A2", ["A3", "C#4", "F#4"]),
-        ("G2", ["G3", "B3", "D4"]), ("F#2", ["F#3", "A3", "D4"]), ("E2", ["E3", "G3", "B3"]), ("A2", ["A3", "C#4", "E4"]),
-        ("G2", ["G3", "B3", "D4"]), ("A2", ["A3", "C#4", "E4"]), ("B2", ["B3", "D4", "F#4"]), ("A2", ["A3", "D4", "E4"]),
-    ]
-    melody = [
-        [("F#5", 2), ("E5", 1), ("D5", 1)],
-        [("E5", 3), ("A4", 1)],
-        [("D5", 1), ("F#5", 1), ("B5", 1.5), ("A5", 0.5)],
-        [("A5", 3), ("F#5", 1)],
-        [("G5", 1.5), ("F#5", 0.5), ("E5", 1), ("D5", 1)],
-        [("D5", 2), ("A4", 1), ("D5", 1)],
-        [("E5", 1), ("G5", 1), ("B5", 1), ("A5", 1)],
-        [("A5", 3), (None, 1)],
-        [("B5", 1.5), ("A5", 0.5), ("G5", 1), ("B5", 1)],
-        [("C#6", 1.5), ("B5", 0.5), ("A5", 1), ("E5", 1)],
-        [("F#5", 1), ("D6", 2), ("C#6", 1)],
-        [("A5", 3), ("E5", 1)],
-    ]
     for b in range(bars):
         t0 = b * bar
-        bass, ch = prog[b]
-        swell = 0.045 + 0.02 * (b >= 8)
-        mix.add(strings([hz(n) for n in ch], bar + 0.3, swell, attack=0.45), t0 - 0.3, send=0.6)
-        mix.add(strings([hz(bass)], bar + 0.2, 0.035, attack=0.5, bright=1200), t0, pan=-0.25, send=0.45)
-        # harp: rolling eighth-note arpeggio up and back
-        arp = [m(bass) + 12] + [m(n) + 12 for n in ch] + [m(ch[0]) + 24]
-        order = [0, 1, 2, 3, 4, 3, 2, 1]
-        for i, idx in enumerate(order):
-            mix.add(harp(hz(arp[idx]), beat * 2.5, 0.26 if i else 0.32), hum(t0 + i * beat / 2, 0.006), pan=0.35 - 0.08 * (idx - 2), send=0.45)
+        for name, off, ln in prog[b]:
+            ts = t0 + off * beat
+            notes = V[name]
+            # Rhodes: strike, and a softer push on the "and" of 3 for long chords
+            for i, n in enumerate(notes):
+                add_pan_lfo(mix, rhodes(hz(n), (ln * beat * 0.95) if ln == 2 else 2.4 * beat, 0.5), hum(ts + i * 0.006, 0.006), send=0.3)
+            if ln == 4:
+                for i, n in enumerate(notes):
+                    add_pan_lfo(mix, rhodes(hz(n), 1.3 * beat, 0.34), hum(ts + 2.5 * beat + i * 0.006, 0.006), send=0.3)
+            # bass
+            r = m(R[name])
+            mix.add(ebass(hz(r), (1.5 if ln == 4 else 1.4) * beat, 0.75), hum(ts, 0.004), pan=-0.05, send=0.08)
+            if ln == 4:
+                mix.add(ebass(hz(r + 7), 0.4 * beat, 0.5), hum(ts + 2.5 * beat, 0.004), send=0.08)
+                mix.add(ebass(hz(r), 0.9 * beat, 0.6), hum(ts + 3 * beat, 0.004), send=0.08)
+            # a whisper of pad for warmth
+            mix.add(strings([hz(n) for n in notes], ln * beat + 0.2, 0.010, attack=0.6, bright=1600), ts - 0.2, send=0.5)
+        # drums: soft and close
+        mix.add(kick(0.55), hum(t0, 0.003)); mix.add(kick(0.38), hum(t0 + 2.5 * beat, 0.004))
+        mix.add(rim(0.18), hum(t0 + beat, 0.006), pan=0.15); mix.add(rim(0.2), hum(t0 + 3 * beat, 0.006), pan=0.15)
+        for i in range(8):
+            mix.add(shaker(0.07 if i % 2 == 0 else 0.1), hum(t0 + swing(i, beat, 0.6), 0.004), pan=0.35, send=0.15)
+        mix.add(brush(0.04), t0 + 1.5 * beat, pan=-0.3); mix.add(brush(0.04), t0 + 3.5 * beat, pan=-0.3)
+        # vibraphone melody
         t = t0
         for n, beats in melody[b]:
             if n is not None:
-                mix.add(flute(hz(n), beats * beat * 0.96, 0.13), hum(t, 0.01), pan=-0.1, send=0.55)
+                mix.add(vibes(hz(n), beats * beat * 0.95, 0.55 if b < 8 else 0.62), hum(t, 0.008), pan=0.2, send=0.45)
             t += beats * beat
-    return finish(mix, length, wet=0.6)
+    return finish(mix, length, wet=0.45)
+
+
+# ================================================================== 2. Slow Dance in the Kitchen (lo-fi)
+
+def slow_dance():
+    bpm = 76.0; beat = 60 / bpm; bar = 4 * beat
+    V = {"Dm9": ["F3", "A3", "C4", "E4"], "G13": ["F3", "B3", "E4", "A4"], "Cmaj9": ["E3", "G3", "B3", "D4"], "A7b13": ["G3", "C#4", "F4"]}
+    R = {"Dm9": "D2", "G13": "G2", "Cmaj9": "C2", "A7b13": "A2"}
+    cyc = ["Dm9", "G13", "Cmaj9", "A7b13"]
+    melody = [
+        [(None, 1), ("A5", .5), ("C6", .5), ("E6", 1), ("D6", 1)],
+        [("B5", 1.5), ("A5", .5), ("G5", 2)],
+        [("E5", .5), ("G5", .5), ("B5", 1), ("A5", 1), ("G5", 1)],
+        [("C#6", 1), ("A5", 1), ("F5", 2)],
+        [(None, 1), ("F5", .5), ("A5", .5), ("C6", 1), ("E6", 1)],
+        [("D6", 1), ("B5", 1), ("A5", .5), ("G5", 1.5)],
+        [("E5", 1), ("G5", 1), ("D6", 2)],
+        [("C#6", 2), ("A5", 2)],
+    ]
+    sw = 0.62
+    bars = 16
+    length = bars * bar
+    mix = Mix(length)
+    for b in range(bars):
+        t0 = b * bar
+        name = cyc[b % 4]
+        notes = V[name]
+        # dusty Rhodes: a slightly late, lazy roll + a push on the swung "and" of 2
+        for i, n in enumerate(notes):
+            add_pan_lfo(mix, rhodes(hz(n), 2.6 * beat, 0.48, wow=0.0025), hum(t0 + 0.02 + i * 0.012, 0.006), rate=0.5, send=0.25)
+            add_pan_lfo(mix, rhodes(hz(n), 1.4 * beat, 0.33, wow=0.0025), hum(t0 + swing(5, beat, sw) + i * 0.01, 0.006), rate=0.5, send=0.25)
+        r = m(R[name])
+        mix.add(ebass(hz(r), 2.5 * beat, 0.8), hum(t0, 0.004), send=0.05)
+        mix.add(ebass(hz(r + 7 if b % 2 == 0 else r + 12), 0.8 * beat, 0.55), hum(t0 + swing(5, beat, sw), 0.004), send=0.05)
+        # boom-bap, laid back
+        mix.add(kick(0.62), hum(t0, 0.003)); mix.add(kick(0.45), hum(t0 + swing(5, beat, sw), 0.004))
+        if b % 2 == 1: mix.add(kick(0.3), hum(t0 + swing(7, beat, sw), 0.004))
+        mix.add(snare(0.3, lofi=True), hum(t0 + beat + 0.015, 0.006), pan=0.05, send=0.2)
+        mix.add(snare(0.32, lofi=True), hum(t0 + 3 * beat + 0.015, 0.006), pan=0.05, send=0.2)
+        for i in range(8):
+            mix.add(hat(0.06 if i % 2 else 0.085), hum(t0 + swing(i, beat, sw), 0.005), pan=0.3, send=0.05)
+        # melody on a high Rhodes in the second half
+        if b >= 8:
+            t = t0
+            for n, beats in melody[b - 8]:
+                if n is not None:
+                    add_pan_lfo(mix, rhodes(hz(n), beats * beat * 0.9, 0.5, wow=0.002), hum(t, 0.01), rate=0.5, depth=0.3, send=0.4)
+                t += beats * beat
+    # vinyl
+    cr = crackle(length, 7, 0.06)
+    mix.add(cr, 0, pan=-0.2, send=0); mix.add(crackle(length, 6, 0.05), 0, pan=0.2, send=0)
+    return finish(mix, length, wet=0.35, lp=6200)
+
+
+# ================================================================== 3. Our Little Home (acoustic, whistled)
+
+def our_home():
+    bpm = 84.0; beat = 60 / bpm; bar = 4 * beat
+    # (bass1, bass2, [treble chord tones])
+    C = {
+        "G": ("G2", "D3", ["B3", "D4", "G4"]), "D/F#": ("F#2", "A2", ["A3", "D4", "F#4"]), "Em": ("E2", "B2", ["G3", "B3", "E4"]),
+        "C": ("C3", "G2", ["G3", "C4", "E4"]), "D": ("D3", "A2", ["A3", "D4", "F#4"]),
+    }
+    prog = ["G", "D/F#", "Em", "C", "G", "D", "C", "D", "Em", "C", "G", "D", "C", "D/F#", "G", "G"]
+    melody = [
+        [("D5", 1), ("G5", 1), ("B5", 1.5), ("A5", .5)],
+        [("A5", 2), ("F#5", 1), ("D5", 1)],
+        [("E5", 1), ("G5", 1), ("B5", 1), ("G5", 1)],
+        [("E5", 3), (None, 1)],
+        [("D5", 1), ("G5", 1), ("B5", 1), ("D6", 1)],
+        [("C6", 1.5), ("B5", .5), ("A5", 2)],
+        [("G5", 1), ("E5", 1), ("C5", 1), ("E5", 1)],
+        [("D5", 3), (None, 1)],
+        [("B5", 1.5), ("A5", .5), ("G5", 1), ("B5", 1)],
+        [("C6", 1), ("B5", 1), ("G5", 2)],
+        [("D5", 1), ("G5", 1), ("A5", 1), ("B5", 1)],
+        [("A5", 3), (None, 1)],
+        [("E5", 1), ("G5", 1), ("C6", 1), ("B5", 1)],
+        [("A5", 1), ("F#5", 1), ("D5", 1), ("A5", 1)],
+        [("B5", 2), ("A5", 1), ("G5", 1)],
+        [("G5", 3), (None, 1)],
+    ]
+    sw = 0.54
+    bars = 16
+    length = bars * bar
+    mix = Mix(length)
+    wnotes = []
+    for b in range(bars):
+        t0 = b * bar
+        b1, b2, tr = C[prog[b]]
+        # Travis picking: thumb alternates bass, fingers pick the chord tones in between
+        pattern = [b1, tr[0], b2, tr[1], b1, tr[2], b2, tr[0]]
+        for i, n in enumerate(pattern):
+            at = t0 + swing(i, beat, sw)
+            ring = bar - (at - t0) + 0.5
+            v = 0.3 if i % 2 == 0 else 0.22
+            mix.add(nylon(hz(n), ring, v), hum(at, 0.006), pan=-0.25 + 0.12 * (i % 3), send=0.3)
+        # shaker from bar 5, a soft heartbeat kick on 1 and 3 in the second half
+        if b >= 4:
+            for i in range(8):
+                mix.add(shaker(0.12 if i % 2 == 0 else 0.18), hum(t0 + swing(i, beat, sw), 0.004), pan=0.4, send=0.1)
+        if b >= 8:
+            mix.add(kick(0.35), hum(t0, 0.003)); mix.add(kick(0.25), hum(t0 + 2 * beat, 0.003))
+        t = t0
+        for n, beats in melody[b]:
+            if n is not None:
+                wnotes.append((t, beats * beat * 0.94, hz(n)))
+                # a little glockenspiel sparkle doubling the tune in the second half
+                if b >= 8:
+                    mix.add(vibes(hz(m(n) + 12), beats * beat * 0.5, 0.2, ring=1.0, motor=False), hum(t, 0.006), pan=0.35, send=0.4)
+            t += beats * beat
+    mix.add(whistle_line(wnotes, length, 0.095), 0, pan=0.1, send=0.45)
+    return finish(mix, length, wet=0.4)
+
 
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "app/src/main/res/raw"
     os.makedirs(out, exist_ok=True)
-    save("love_song_serenade.ogg", serenade(), out)
+    save("love_song_stillyou.ogg", still_you(), out)
+    save("love_song_slowdance.ogg", slow_dance(), out)
+    save("love_song_ourhome.ogg", our_home(), out)
     save("love_song_moonlight.ogg", moonlight(), out)
-    save("love_song_forever.ogg", forever(), out)
