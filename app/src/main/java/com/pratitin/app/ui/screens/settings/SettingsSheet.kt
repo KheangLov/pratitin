@@ -128,6 +128,7 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
                 SectionTitle(s.reminders)
                 SettingRow("🔔 ${s.enableReminders}") { LiquidToggle(settings.notify, { v -> enableNotifications(v) }) }
+                AlertControls()
                 if (denied) Text(s.permissionDenied, style = HeritageType.micro, color = p.holidayKhmer)
                 AnimatedVisibility(settings.notify, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                     Column {

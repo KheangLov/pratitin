@@ -66,8 +66,14 @@ class MainActivity : ComponentActivity() {
         vm.refreshToday()
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.pratitin.app.notify.InAppAlerts.visible = true
+    }
+
     override fun onStop() {
         super.onStop()
+        com.pratitin.app.notify.InAppAlerts.visible = false
         vm.backupNow()
         com.pratitin.app.widget.WidgetRefresher.refreshAll(this)
     }

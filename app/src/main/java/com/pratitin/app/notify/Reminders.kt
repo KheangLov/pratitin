@@ -50,11 +50,14 @@ import java.time.ZoneId
  * (calendar apps may hold USE_EXACT_ALARM), otherwise inexact while-idle alarms.
  */
 object Reminders {
-    const val CH_HOLIDAY = "holidays"
-    const val CH_EVENT = "events"
-    const val CH_BUDDHIST = "buddhist"
-    const val CH_MOOD = "mood"
-    const val CH_LOVE = "love"
+    // v2: every channel pops up on screen (IMPORTANCE_HIGH). Android never lets an app raise
+    // an existing channel's importance, so the old ids are replaced (and deleted below).
+    const val CH_HOLIDAY = "holidays2"
+    const val CH_EVENT = "events2"
+    const val CH_BUDDHIST = "buddhist2"
+    const val CH_MOOD = "mood2"
+    const val CH_LOVE = "love2"
+    private val LEGACY = mapOf("holidays" to CH_HOLIDAY, "events" to CH_EVENT, "buddhist" to CH_BUDDHIST, "mood" to CH_MOOD, "love" to CH_LOVE)
     const val EXTRA_DATE = "open_date"
     const val EXTRA_TAB = "open_tab"
     private const val MAX_ALARMS = 48
@@ -67,15 +70,16 @@ object Reminders {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun createChannels(ctx: Context) {
+        deleteLegacyChannels(ctx)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
         val km = ctx.resources.configuration.locales[0].language == "km"
         fun ch(id: String, en: String, kh: String, imp: Int) = NotificationChannel(id, if (km) kh else en, imp)
         nm.createNotificationChannels(listOf(
-            ch(CH_HOLIDAY, "Holidays & New Year", "ថ្ងៃបុណ្យ និងចូលឆ្នាំ", NotificationManager.IMPORTANCE_DEFAULT),
+            ch(CH_HOLIDAY, "Holidays & New Year", "ថ្ងៃបុណ្យ និងចូលឆ្នាំ", NotificationManager.IMPORTANCE_HIGH),
             ch(CH_EVENT, "Your events & birthdays", "ព្រឹត្តិការណ៍ និងខួបកំណើត", NotificationManager.IMPORTANCE_HIGH),
-            ch(CH_BUDDHIST, "Sila & Buddhist days", "ថ្ងៃសីល និងពិធីបុណ្យ", NotificationManager.IMPORTANCE_LOW),
-            ch(CH_MOOD, "Daily mood check-in", "កត់ត្រាអារម្មណ៍ប្រចាំថ្ងៃ", NotificationManager.IMPORTANCE_LOW),
+            ch(CH_BUDDHIST, "Sila & Buddhist days", "ថ្ងៃសីល និងពិធីបុណ្យ", NotificationManager.IMPORTANCE_HIGH),
+            ch(CH_MOOD, "Daily mood check-in", "កត់ត្រាអារម្មណ៍ប្រចាំថ្ងៃ", NotificationManager.IMPORTANCE_HIGH),
             ch(CH_LOVE, "Anniversaries & love", "ខួបស្នេហា", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = if (km) "ខួបអាពាហ៍ពិពាហ៍ ខួបស្នេហា និងថ្ងៃពិសេសរបស់យើង" else "Wedding & love anniversaries, milestones and monthiversaries"
                 setSound(
@@ -88,6 +92,12 @@ object Reminders {
                 lightColor = 0xFFEE8FB0.toInt()
             },
         ))
+    }
+
+    /** Removes the pre-v2 channels (their importance can't be raised in place). */
+    private fun deleteLegacyChannels(ctx: Context) {
+        val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
+        LEGACY.keys.forEach { runCatching { nm.deleteNotificationChannel(it) } }
     }
 
     /** Fire-and-forget re-plan (safe from any thread). */
@@ -335,7 +345,11 @@ object Reminders {
     fun canPost(ctx: Context) = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun show(ctx: Context, id: Int, title: String, text: String, channel: String, date: Int, tab: String? = null) {
+    fun show(ctx: Context, id: Int, title: String, text: String, channel0: String, date: Int, tab: String? = null) {
+        val channel = LEGACY[channel0] ?: channel0  // alarms armed by an older version
+        // App on screen: pop up inside the app; the tray copy is silent so it doesn't pop twice.
+        val inApp = InAppAlerts.visible && InAppAlerts.enabled(ctx) &&
+            InAppAlerts.emit(InAppAlerts.Alert(id, title, text, channel, date, tab))
         if (!canPost(ctx)) return
         val open = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -352,6 +366,10 @@ object Reminders {
             .setContentIntent(pi)
             .setAutoCancel(true)
             .setCategory(if (channel == CH_EVENT || channel == CH_LOVE) NotificationCompat.CATEGORY_EVENT else NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setSilent(inApp)
             .build()
         try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (_: SecurityException) { }
     }

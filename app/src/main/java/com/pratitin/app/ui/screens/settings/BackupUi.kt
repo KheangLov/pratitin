@@ -201,3 +201,48 @@ fun RestorePromptCard(shell: ShellState, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/** Pop-up controls: in-app pop-ups, a test, and the phone's notification settings. */
+@Composable
+fun AlertControls() {
+    val ctx = LocalContext.current
+    val km = LocalStrings.current.lang == Lang.KM
+    val p = LocalPalette.current
+    var inApp by remember { mutableStateOf(com.pratitin.app.notify.InAppAlerts.enabled(ctx)) }
+    SettingRow(if (km) "💬 លោតផ្ទាំងក្នុងកម្មវិធី ពេលកំពុងបើក" else "💬 Pop up inside the app while it's open") {
+        LiquidToggle(inApp, { v -> inApp = v; com.pratitin.app.notify.InAppAlerts.setEnabled(ctx, v) })
+    }
+    Text(
+        if (km) "ពេលកម្មវិធីបិទ ការរំលឹកលោតឡើងលើអេក្រង់ទូរស័ព្ទ (Pop-up) ម្ដង។ បើមិនលោត សូមបើក «Pop-up / Floating notifications» ក្នុងការកំណត់ទូរស័ព្ទ។"
+        else "When the app is closed, reminders pop up once on your phone's screen. If they don't, turn on \"Pop-up / Floating notifications\" in your phone's settings.",
+        style = HeritageType.micro, color = p.inkSoft, modifier = Modifier.padding(bottom = 6.dp),
+    )
+    Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Pill(if (km) "🔔 សាកល្បងឥឡូវ" else "🔔 Test now", Modifier.weight(1f)) {
+            com.pratitin.app.notify.Reminders.show(
+                ctx, 9_001, if (km) "🪷 ការរំលឹកសាកល្បង" else "🪷 Test reminder",
+                if (km) "នេះជារបៀបដែលការរំលឹកលោតឡើង" else "This is how reminders pop up",
+                com.pratitin.app.notify.Reminders.CH_EVENT, com.pratitin.app.util.Day.today(),
+            )
+        }
+        Pill(if (km) "📱 សាកល្បងក្រោយ ៥ វិ" else "📱 Test in 5 s", Modifier.weight(1f)) {
+            // leave the app (or lock the phone) to see the phone's own pop-up
+            val am = ctx.getSystemService(android.app.AlarmManager::class.java)
+            val i = android.content.Intent(ctx, com.pratitin.app.notify.ReminderReceiver::class.java).apply {
+                putExtra("title", if (km) "🪷 ការរំលឹកសាកល្បង" else "🪷 Test reminder")
+                putExtra("text", if (km) "ការជូនដំណឹងលោតលើអេក្រង់ទូរស័ព្ទ" else "Your phone's pop-up notification")
+                putExtra("channel", com.pratitin.app.notify.Reminders.CH_EVENT); putExtra("id", 9_002)
+                putExtra(com.pratitin.app.notify.Reminders.EXTRA_DATE, com.pratitin.app.util.Day.today())
+            }
+            val pi = android.app.PendingIntent.getBroadcast(ctx, 9_002, i, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+            am?.set(android.app.AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 5_000, pi)
+            Toast.makeText(ctx, if (km) "ចាកចេញពីកម្មវិធី ឬចាក់សោអេក្រង់ឥឡូវនេះ…" else "Leave the app or lock the screen now…", Toast.LENGTH_SHORT).show()
+        }
+    }
+    Pill(if (km) "⚙️ ការកំណត់ការជូនដំណឹងរបស់ទូរស័ព្ទ" else "⚙️ Phone notification settings", Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        runCatching {
+            ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+}

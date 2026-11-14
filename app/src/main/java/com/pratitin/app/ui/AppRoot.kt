@@ -191,6 +191,21 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         }
     }
 
+    // First launch: ask once (Android's own popup) to allow notifications, and turn reminders on.
+    val ctx = LocalContext.current
+    val notifPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) vm.updateSettings { it.copy(notify = true) } }
+    LaunchedEffect(Unit) {
+        if (!com.pratitin.app.notify.InAppAlerts.askedPermission(ctx)) {
+            com.pratitin.app.notify.InAppAlerts.setAskedPermission(ctx)
+            kotlinx.coroutines.delay(1200) // after the splash and the first frame
+            if (android.os.Build.VERSION.SDK_INT >= 33 && !com.pratitin.app.notify.Reminders.canPost(ctx)) {
+                notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            } else vm.updateSettings { it.copy(notify = true) }
+        }
+    }
+
     // Notification tap → open a tab (anniversary reminders open Love).
     val pendingTab by vm.pendingTab.collectAsStateWithLifecycle()
     LaunchedEffect(pendingTab) {
@@ -348,6 +363,16 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
         AnimatedVisibility(visible = loveProfileOpen, enter = fadeIn(), exit = fadeOut()) {
             LoveProfileSheet(shell, onDismiss = { loveProfileOpen = false })
         }
+        // Reminders that fire while the app is open pop up here.
+        com.pratitin.app.ui.components.AlertBanner(
+            onOpen = { a ->
+                when {
+                    a.tab != null -> vm.pendingTab.value = a.tab
+                    a.date != 0 -> vm.pendingOpen.value = a.date
+                }
+            },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
     }
 }
