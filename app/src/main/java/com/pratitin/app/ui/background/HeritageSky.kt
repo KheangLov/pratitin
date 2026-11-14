@@ -178,7 +178,7 @@ private fun DrawScope.drawSparkle(c: Offset, r: Float, color: Color) {
 
 // ====================================================================== 1. Lunar dial
 
-private class DialGeo(w: Float, h: Float) {
+private class DialGeo(val w: Float, h: Float) {
     val k = w / 1080f
     val R = w * 1.167f
     val arcTop = h * 0.70f
