@@ -54,6 +54,7 @@ import com.pratitin.app.ui.heritage.KbachDivider
 import com.pratitin.app.ui.theme.HeritageType
 import com.pratitin.app.ui.theme.LocalPalette
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
     val settings = shell.vm.settings.collectAsStateWithLifecycle().value ?: return
@@ -99,6 +100,14 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
                     GlassChip(s.dark, settings.theme == ThemeMode.DARK, shell.content, leading = "🌙") { upd { it.copy(theme = ThemeMode.DARK) } }
                     GlassChip(s.light, settings.theme == ThemeMode.LIGHT, shell.content, leading = "☀️") { upd { it.copy(theme = ThemeMode.LIGHT) } }
                     GlassChip(s.system, settings.theme == ThemeMode.SYSTEM, shell.content) { upd { it.copy(theme = ThemeMode.SYSTEM) } }
+                }
+                Spacer(Modifier.height(16.dp))
+                SectionTitle(s.background)
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("✨", "🌙", "🏵️", "🪷").forEachIndexed { i, e ->
+                        GlassChip(s.sceneNames[i], settings.scene == i, shell.content, leading = e) { upd { it.copy(scene = i) } }
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 SettingRow(s.livingSky) { LiquidToggle(settings.livingSky, { v -> upd { it.copy(livingSky = v) } }) }

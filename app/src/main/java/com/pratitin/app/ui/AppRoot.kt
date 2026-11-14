@@ -250,7 +250,23 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
             // Layer 1 — the sky that cards look through
             Box(Modifier.fillMaxSize().backdropSource(bg)) {
                 // Own RenderNode: the 30 fps sky re-records only itself, never the screens on top.
-                HeritageSky(animate = animateSky && tab == Tab.TODAY && !detailOpen && !settingsOpen && editing == null, parallax = { scroll.floatValue }, modifier = Modifier.graphicsLayer())
+                val settingsNow = vm.settings.collectAsStateWithLifecycle().value
+                val todayNow by vm.today.collectAsStateWithLifecycle()
+                val lunar = remember(todayNow) {
+                    val k = com.pratitin.app.ui.screens.khmerOf(todayNow)
+                    com.pratitin.app.ui.background.LunarInfo(k.illumination, k.dayNumber < 15, k.dayNumber, com.pratitin.khmer.KhmerCalendar.daysInMonth(k.monthIndex, k.beYear))
+                }
+                val scene = when (settingsNow?.scene ?: 0) {
+                    1 -> com.pratitin.app.ui.background.Scene.DIAL
+                    2 -> com.pratitin.app.ui.background.Scene.MANDALA
+                    3 -> com.pratitin.app.ui.background.Scene.POND
+                    else -> when (tab) {
+                        Tab.TODAY -> com.pratitin.app.ui.background.Scene.DIAL
+                        Tab.LOVE -> com.pratitin.app.ui.background.Scene.POND
+                        else -> com.pratitin.app.ui.background.Scene.MANDALA
+                    }
+                }
+                HeritageSky(scene, lunar, animate = animateSky && !anySheet, parallax = { scroll.floatValue }, modifier = Modifier.graphicsLayer())
             }
             CompositionLocalProvider(LocalEnclosingBackdrop provides content) {
             AnimatedContent(

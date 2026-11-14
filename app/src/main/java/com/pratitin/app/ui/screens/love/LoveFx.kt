@@ -77,7 +77,7 @@ fun LoveAmbience(modifier: Modifier = Modifier) {
     val clock = com.pratitin.app.ui.motion.LocalAmbientClock.current
     val floaters = remember {
         val r = java.util.Random(214)
-        List(26) { i ->
+        List(16) { i ->
             Floater(
                 x = r.nextFloat(), speed = 0.6f + r.nextFloat() * 0.9f, size = 8f + r.nextFloat() * 16f, phase = r.nextFloat(),
                 sway = 10f + r.nextFloat() * 26f, swaySpeed = 1f + r.nextFloat() * 2f, color = r.nextInt(4), sparkle = i % 3 == 0,
@@ -88,16 +88,8 @@ fun LoveAmbience(modifier: Modifier = Modifier) {
     Canvas(modifier) {
         // one 48 s cycle of the shared ambient clock (30 fps, sleeps when idle)
         val t = clock?.let { (it.time / 48f) % 1f } ?: 0.3f
-        // veil: wine at the top, fading through, a blush glow low down
-        drawRect(Brush.verticalGradient(
-            0f to lp.wine.copy(alpha = if (p.isDark) 0.55f else 0.22f),
-            0.45f to lp.rose.copy(alpha = if (p.isDark) 0.10f else 0.06f),
-            1f to lp.blush.copy(alpha = if (p.isDark) 0.16f else 0.18f),
-        ))
-        drawCircle(
-            Brush.radialGradient(listOf(lp.glow.copy(alpha = if (p.isDark) 0.22f else 0.14f), Color.Transparent), center = Offset(size.width * 0.5f, size.height * 0.22f), radius = size.width * 0.8f),
-            radius = size.width * 0.8f, center = Offset(size.width * 0.5f, size.height * 0.22f),
-        )
+        // a faint wine veil at the very top only: the pond scene below stays clear
+        drawRect(Brush.verticalGradient(0f to lp.wine.copy(alpha = if (p.isDark) 0.35f else 0.12f), 0.4f to Color.Transparent))
         val colors = arrayOf(lp.rose, lp.blush, lp.roseGold, lp.glow)
         val h = size.height + 80f
         floaters.forEach { f ->

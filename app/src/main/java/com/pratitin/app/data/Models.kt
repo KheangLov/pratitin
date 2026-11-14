@@ -38,6 +38,8 @@ data class Settings(
     val showSila: Boolean = true,
     val khmerNumerals: Boolean = true,
     val livingSky: Boolean = true,
+    /** background scene: 0 = auto (dial on Today, pond on Love, mandala elsewhere), 1 dial, 2 mandala, 3 pond */
+    val scene: Int = 0,
     val maxLeave: Int = 3,
     // ---- reminders
     val notify: Boolean = false,

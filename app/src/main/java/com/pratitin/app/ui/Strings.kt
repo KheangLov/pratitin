@@ -32,6 +32,7 @@ data class Strings(
     val reminders: String, val enableReminders: String, val rHolidays: String, val rGlobal: String, val rSila: String,
     val rNewYear: String, val rMood: String, val rWhen: String, val rEve: String, val rMorning: String, val permissionDenied: String,
     val date: String,
+    val background: String, val sceneNames: List<String>,
     /** Khmer digits (០១២…) vs Arabic digits — user setting, only meaningful in Khmer. */
     val khmerDigits: Boolean = lang == Lang.KM,
 ) {
@@ -72,6 +73,7 @@ val KhmerStrings = Strings(
     rSila = "ថ្ងៃសីល និងពិធីបុណ្យ", rNewYear = "ចូលឆ្នាំខ្មែរ (ម៉ោងទេវតាចុះ)", rMood = "រំលឹកកត់ត្រាអារម្មណ៍ ម៉ោង ៩ យប់",
     rWhen = "ពេលរំលឹកថ្ងៃបុណ្យ", rEve = "ល្ងាចមុន ម៉ោង ៧", rMorning = "ព្រឹកនោះ ម៉ោង ៧",
     permissionDenied = "សូមអនុញ្ញាតការជូនដំណឹងក្នុងការកំណត់ទូរស័ព្ទ", date = "កាលបរិច្ឆេទ",
+    background = "ផ្ទៃខាងក្រោយ", sceneNames = listOf("ស្វ័យប្រវត្តិ", "កង់ចន្ទគតិ", "ក្បាច់មណ្ឌល", "ស្រះឈូក"),
 )
 
 val EnglishStrings = Strings(
@@ -106,6 +108,7 @@ val EnglishStrings = Strings(
     rSila = "Sila & Buddhist days", rNewYear = "Khmer New Year (Songkran moment)", rMood = "Mood check-in at 9 PM",
     rWhen = "Holiday reminder time", rEve = "Evening before, 7 PM", rMorning = "That morning, 7 AM",
     permissionDenied = "Allow notifications in your phone settings", date = "Date",
+    background = "Background", sceneNames = listOf("Auto", "Lunar dial", "Kbach mandala", "Lotus pond"),
 )
 
 val LocalStrings = staticCompositionLocalOf { KhmerStrings }

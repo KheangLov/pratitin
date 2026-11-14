@@ -40,6 +40,7 @@ class SettingsStore(private val context: Context) {
         val sila = booleanPreferencesKey("show_sila")
         val numerals = booleanPreferencesKey("khmer_numerals")
         val sky = booleanPreferencesKey("living_sky")
+        val scene = intPreferencesKey("scene")
         val leave = intPreferencesKey("max_leave")
         val notify = booleanPreferencesKey("notify")
         val nHol = booleanPreferencesKey("n_holidays")
@@ -63,6 +64,7 @@ class SettingsStore(private val context: Context) {
             showSila = p[K.sila] ?: d.showSila,
             khmerNumerals = p[K.numerals] ?: d.khmerNumerals,
             livingSky = p[K.sky] ?: d.livingSky,
+            scene = p[K.scene] ?: d.scene,
             maxLeave = p[K.leave] ?: d.maxLeave,
             notify = p[K.notify] ?: d.notify,
             notifyHolidays = p[K.nHol] ?: d.notifyHolidays,
@@ -82,7 +84,7 @@ class SettingsStore(private val context: Context) {
             p[K.lang] = n.lang.name; p[K.theme] = n.theme.name; p[K.birth] = n.birthDate
             p[K.life] = n.lifeYears; p[K.monday] = n.weekStartsMonday; p[K.global] = n.showGlobal
             p[K.obs] = n.showObservances; p[K.sila] = n.showSila; p[K.numerals] = n.khmerNumerals
-            p[K.sky] = n.livingSky; p[K.leave] = n.maxLeave
+            p[K.sky] = n.livingSky; p[K.leave] = n.maxLeave; p[K.scene] = n.scene
             p[K.notify] = n.notify; p[K.nHol] = n.notifyHolidays; p[K.nGlobal] = n.notifyGlobal
             p[K.nSila] = n.notifySila; p[K.nNy] = n.notifyNewYear; p[K.nMood] = n.notifyMood; p[K.nEve] = n.holidayEve
         }
