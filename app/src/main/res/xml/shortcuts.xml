@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="love" android:enabled="true" android:icon="@drawable/ic_sc_love"
+        android:shortcutShortLabel="@string/sc_love_short" android:shortcutLongLabel="@string/sc_love_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.pratitin.app"
+            android:targetClass="com.pratitin.app.MainActivity">
+            <extra android:name="open_tab" android:value="love" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="add_event" android:enabled="true" android:icon="@drawable/ic_sc_add"
+        android:shortcutShortLabel="@string/sc_add_event_short" android:shortcutLongLabel="@string/sc_add_event_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.pratitin.app"
+            android:targetClass="com.pratitin.app.MainActivity">
+            <extra android:name="open_tab" android:value="add_event" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="mood" android:enabled="true" android:icon="@drawable/ic_sc_mood"
+        android:shortcutShortLabel="@string/sc_mood_short" android:shortcutLongLabel="@string/sc_mood_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.pratitin.app"
+            android:targetClass="com.pratitin.app.MainActivity">
+            <extra android:name="open_tab" android:value="mood" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="calendar" android:enabled="true" android:icon="@drawable/ic_sc_calendar"
+        android:shortcutShortLabel="@string/sc_calendar_short" android:shortcutLongLabel="@string/sc_calendar_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.pratitin.app"
+            android:targetClass="com.pratitin.app.MainActivity">
+            <extra android:name="open_tab" android:value="calendar" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="holidays" android:enabled="true" android:icon="@drawable/ic_sc_holidays"
+        android:shortcutShortLabel="@string/sc_holidays_short" android:shortcutLongLabel="@string/sc_holidays_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.pratitin.app"
+            android:targetClass="com.pratitin.app.MainActivity">
+            <extra android:name="open_tab" android:value="holidays" />
+        </intent>
+    </shortcut>
+</shortcuts>

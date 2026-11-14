@@ -189,8 +189,25 @@ private fun Shell(vm: AppViewModel, animateSky: Boolean) {
     // Notification tap → open a tab (anniversary reminders open Love).
     val pendingTab by vm.pendingTab.collectAsStateWithLifecycle()
     LaunchedEffect(pendingTab) {
-        if (pendingTab == "love") { detailOpen = false; settingsOpen = false; tab = Tab.LOVE }
-        if (pendingTab != null) vm.pendingTab.value = null
+        val pt = pendingTab
+        if (pt != null) {
+            detailOpen = false; settingsOpen = false; loveEditing = null; loveProfileOpen = false; editing = null
+            when {
+                pt == "love" -> tab = Tab.LOVE
+                pt == "calendar" -> tab = Tab.CALENDAR
+                pt == "holidays" -> tab = Tab.HOLIDAYS
+                pt == "mood" -> tab = Tab.MOOD
+                pt == "life" -> tab = Tab.LIFE
+                pt == "today" -> tab = Tab.TODAY
+                pt == "add_event" -> { tab = Tab.TODAY; editing = com.pratitin.app.ui.screens.events.newEvent(vm.today.value) to true }
+                pt.startsWith("mood:") -> {
+                    // one-tap mood from the widget
+                    com.pratitin.app.data.Mood.entries.firstOrNull { it.name == pt.removePrefix("mood:") }?.let { vm.setMood(vm.today.value, it) }
+                    tab = Tab.MOOD
+                }
+            }
+            vm.pendingTab.value = null
+        }
     }
 
     BackHandler(enabled = loveEditing != null || loveProfileOpen || editing != null || detailOpen || settingsOpen || tab != Tab.TODAY) {

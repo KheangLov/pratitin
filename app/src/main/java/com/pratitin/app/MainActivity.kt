@@ -22,6 +22,7 @@ class PratitinApp : Application() {
         super.onCreate()
         Reminders.createChannels(this)
         Reminders.rescheduleAsync(this)
+        com.pratitin.app.widget.WidgetRefresher.scheduleMidnight(this)
         // Warm the lunar tables off the main thread so the first frame never computes them.
         thread(name = "chhankitek-prefetch", priority = Thread.MIN_PRIORITY) {
             val y = LocalDate.now().year
@@ -63,5 +64,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         vm.refreshToday()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        com.pratitin.app.widget.WidgetRefresher.refreshAll(this)
     }
 }

@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ប្រតិទិន</string>
-    <string name="widget_name">Pratitin · Today</string>
-    <string name="widget_description">Today\'s Khmer lunar date and the next holiday</string>
+    <string name="widget_name">ថ្ងៃនេះ · ចន្ទគតិ</string>
+    <string name="widget_description">ថ្ងៃខែចន្ទគតិ សប្ដាហ៍នេះ និងថ្ងៃបុណ្យខាងមុខ</string>
+    <string name="widget_love_name">ស្នេហារបស់យើង</string>
+    <string name="widget_love_description">រាប់ថ្ងៃដែលយើងនៅជាមួយគ្នា និងខួបបន្ទាប់</string>
+    <string name="widget_month_name">ប្រតិទិនខែ</string>
+    <string name="widget_month_description">ប្រតិទិនមួយខែ ជាមួយថ្ងៃចន្ទគតិ និងថ្ងៃបុណ្យ</string>
+    <string name="widget_mood_name">កត់ត្រាអារម្មណ៍</string>
+    <string name="widget_mood_description">ចុចតែម្ដង ដើម្បីកត់អារម្មណ៍ថ្ងៃនេះ</string>
+    <string name="widget_holidays_name">ថ្ងៃបុណ្យខាងមុខ</string>
+    <string name="widget_holidays_description">រាប់ថយក្រោយដល់ថ្ងៃឈប់សម្រាកបន្ទាប់</string>
+    <string name="sc_love_short">ស្នេហា</string>
+    <string name="sc_love_long">ស្នេហារបស់យើង</string>
+    <string name="sc_add_event_short">បន្ថែម</string>
+    <string name="sc_add_event_long">បន្ថែមព្រឹត្តិការណ៍</string>
+    <string name="sc_mood_short">អារម្មណ៍</string>
+    <string name="sc_mood_long">កត់ត្រាអារម្មណ៍ថ្ងៃនេះ</string>
+    <string name="sc_calendar_short">ប្រតិទិន</string>
+    <string name="sc_calendar_long">បើកប្រតិទិន</string>
+    <string name="sc_holidays_short">ថ្ងៃបុណ្យ</string>
+    <string name="sc_holidays_long">ថ្ងៃបុណ្យ និងថ្ងៃឈប់</string>
 </resources>

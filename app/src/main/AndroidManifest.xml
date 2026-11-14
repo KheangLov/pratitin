@@ -27,6 +27,8 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- long-press quick actions -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
         <receiver android:name=".notify.ReminderReceiver" android:exported="false" />
@@ -50,5 +52,22 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/today_widget_info" />
         </receiver>
+        <receiver android:name=".widget.LoveWidgetReceiver" android:exported="true" android:label="@string/widget_love_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/love_widget_info" />
+        </receiver>
+        <receiver android:name=".widget.MonthWidgetReceiver" android:exported="true" android:label="@string/widget_month_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/month_widget_info" />
+        </receiver>
+        <receiver android:name=".widget.MoodWidgetReceiver" android:exported="true" android:label="@string/widget_mood_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/mood_widget_info" />
+        </receiver>
+        <receiver android:name=".widget.HolidaysWidgetReceiver" android:exported="true" android:label="@string/widget_holidays_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/holidays_widget_info" />
+        </receiver>
+        <receiver android:name=".widget.WidgetTickReceiver" android:exported="false" />
     </application>
 </manifest>

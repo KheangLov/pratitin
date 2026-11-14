@@ -73,6 +73,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _today.value = Day.today()
             }
         }
+        // Widgets follow moods, events, anniversaries and settings (after the stores' own debounced writes).
+        combine(moods, events, love, settings) { a, b, c, d -> listOf(a, b, c, d) }
+            .drop(1).debounce(1500)
+            .onEach { com.pratitin.app.widget.WidgetRefresher.refreshAll(app) }
+            .launchIn(viewModelScope)
         // Re-plan reminders whenever a reminder-relevant setting changes.
         settings.filterNotNull()
             .map { listOf(it.notify, it.notifyHolidays, it.notifyGlobal, it.notifySila, it.notifyNewYear, it.notifyMood, it.holidayEve, it.lang, it.birthDate, it.showGlobal) }

@@ -384,6 +384,7 @@ class RescheduleReceiver : BroadcastReceiver() {
             try {
                 Reminders.createChannels(context)
                 Reminders.reschedule(context.applicationContext)
+                com.pratitin.app.widget.WidgetRefresher.refreshAll(context.applicationContext)
             } finally { pending.finish() }
         }
     }

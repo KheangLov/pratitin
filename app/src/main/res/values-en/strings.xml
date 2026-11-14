@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_name">Today · Lunar date</string>
+    <string name="widget_description">Today\'s Khmer lunar date, this week and the next holiday</string>
+    <string name="widget_love_name">Our love</string>
+    <string name="widget_love_description">Days together and the next anniversary</string>
+    <string name="widget_month_name">Month calendar</string>
+    <string name="widget_month_description">The month with lunar days and holidays</string>
+    <string name="widget_mood_name">Mood check-in</string>
+    <string name="widget_mood_description">Log today\'s mood with one tap</string>
+    <string name="widget_holidays_name">Upcoming holidays</string>
+    <string name="widget_holidays_description">Countdown to the next days off</string>
+    <string name="sc_love_short">Our love</string>
+    <string name="sc_love_long">Our love &amp; anniversaries</string>
+    <string name="sc_add_event_short">Add event</string>
+    <string name="sc_add_event_long">Add an event today</string>
+    <string name="sc_mood_short">Log mood</string>
+    <string name="sc_mood_long">Log today\'s mood</string>
+    <string name="sc_calendar_short">Calendar</string>
+    <string name="sc_calendar_long">Open the calendar</string>
+    <string name="sc_holidays_short">Holidays</string>
+    <string name="sc_holidays_long">Holidays &amp; breaks</string>
+</resources>
