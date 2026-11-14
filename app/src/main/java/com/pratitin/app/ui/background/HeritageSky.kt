@@ -70,10 +70,10 @@ fun HeritageSky(animate: Boolean, parallax: () -> Float, modifier: Modifier = Mo
             }
         }
 
-        // ---- Angkor Wat at the reflecting pool: two painted layers (temple + water, then
-        // palms + reeds) that drift at different speeds on scroll for depth parallax.
-        val backId = if (p.isDark) R.drawable.angkor_back_dusk else R.drawable.angkor_back_day
-        val frontId = if (p.isDark) R.drawable.angkor_front_dusk else R.drawable.angkor_front_day
+        // ---- Khmer countryside: two painted layers (moon, rice paddies and stilt house, then
+        // sugar palms and the lotus pond) that drift at different speeds on scroll for depth parallax.
+        val backId = if (p.isDark) R.drawable.scene_back_dusk else R.drawable.scene_back_day
+        val frontId = if (p.isDark) R.drawable.scene_front_dusk else R.drawable.scene_front_day
         val back = ImageBitmap.imageResource(backId)
         val front = ImageBitmap.imageResource(frontId)
         Image(

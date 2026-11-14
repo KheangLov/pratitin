@@ -7,7 +7,7 @@ A native Android calendar built on the **Khmer lunar calendar (ចន្ទគ�
 - **Mood calendar**: one-tap mood logging, a year-in-pixels grid, a 30-day trend, and how your mood on Sila days compares
 - **Life in weeks**: your whole life as a grid of weeks, with weeks tinted by the moods you logged
 
-The design draws on Khmer heritage: a modern, flag-inspired Angkor Wat (royal-blue sky, crimson band, white temple, blue moat; `tools/render_flag_angkor.py`), kbach (ក្បាច់) ornament borders, lotus motifs, Moul display type, and a lacquer-and-gold palette.
+The design draws on Khmer heritage: the Cambodian countryside at moonrise (sugar palms, rice paddies, a wooden stilt house, a lotus pond; `tools/render_countryside.py`) under a royal-blue sky, kbach (ក្បាច់) ornament borders, lotus motifs, Moul display type, and a lacquer-and-gold palette.
 
 ---
 

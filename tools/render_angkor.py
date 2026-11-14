@@ -1,5 +1,5 @@
 """
-SUPERSEDED by render_flag_angkor.py (the modern, flag-inspired scene now in the app).
+SUPERSEDED by render_countryside.py (the rice-field scene now in the app).
 
 Procedural Angkor Wat scene for Pratitin.
 
