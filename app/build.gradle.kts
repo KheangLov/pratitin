@@ -17,13 +17,30 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // One permanent key for every build, so each new APK installs as an update over the
+    // last one (keeping all data). CI provides it from repository secrets
+    // (PRATITIN_KEYSTORE_BASE64 + PRATITIN_KEYSTORE_PASSWORD, decoded by the workflow);
+    // without them the build falls back to the throwaway debug key.
+    val releaseKeystore = System.getenv("PRATITIN_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) create("pratitin") {
+            storeFile = releaseKeystore
+            storePassword = System.getenv("PRATITIN_KEYSTORE_PASSWORD")
+            keyAlias = "pratitin"
+            keyPassword = System.getenv("PRATITIN_KEYSTORE_PASSWORD")
+        }
+    }
+    val signing = if (releaseKeystore != null) signingConfigs.getByName("pratitin") else signingConfigs.getByName("debug")
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Replace with your own signing config before publishing.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signing
+        }
+        debug {
+            signingConfig = signing
         }
     }
     compileOptions {

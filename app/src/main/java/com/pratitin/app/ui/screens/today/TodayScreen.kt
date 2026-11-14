@@ -156,6 +156,11 @@ fun TodayScreen(shell: ShellState) {
             }
         }
 
+        // ---------------------------------------------------------------- welcome back (fresh install)
+        if (events.isEmpty() && moods.isEmpty() && love.items.isEmpty()) item(key = "restore") {
+            com.pratitin.app.ui.screens.settings.RestorePromptCard(shell, Modifier.enterStagger(2))
+        }
+
         // ---------------------------------------------------------------- love
         item(key = "love") { com.pratitin.app.ui.screens.love.TodayLoveCard(shell, love, today, Modifier.enterStagger(2)) }
 

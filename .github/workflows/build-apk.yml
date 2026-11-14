@@ -21,8 +21,25 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Engine tests
         run: ./gradlew :khmercalendar:test --stacktrace
+      - name: Signing key
+        env:
+          KS: ${{ secrets.PRATITIN_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/pratitin.jks"
+            echo "PRATITIN_KEYSTORE_FILE=$RUNNER_TEMP/pratitin.jks" >> "$GITHUB_ENV"
+            echo "Using the permanent Pratitin signing key"
+          else
+            echo "::warning::PRATITIN_KEYSTORE_BASE64 secret not set: this build uses a temporary key and will NOT install over a previous build"
+          fi
       - name: Build APKs
+        env:
+          PRATITIN_KEYSTORE_PASSWORD: ${{ secrets.PRATITIN_KEYSTORE_PASSWORD }}
         run: ./gradlew :app:assembleDebug :app:assembleRelease --stacktrace
+      - name: Signing certificate
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "SHA-256|DN"
       - name: Collect
         run: |
           mkdir -p dist

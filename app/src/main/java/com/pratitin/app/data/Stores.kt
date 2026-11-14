@@ -116,6 +116,9 @@ class MoodStore(context: Context, private val scope: CoroutineScope) {
         }
     }
 
+    /** Restore from a backup: replaces everything (and saves). */
+    fun replaceAll(map: Map<Int, MoodEntry>) { _moods.value = map }
+
     fun set(date: Int, mood: Mood?, note: String = "") {
         _moods.value = _moods.value.toMutableMap().apply {
             if (mood == null) remove(date) else put(date, MoodEntry(date, mood, note.take(500)))

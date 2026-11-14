@@ -145,6 +145,8 @@ fun SettingsSheet(shell: ShellState, onDismiss: () -> Unit) {
                 }
 
                 Spacer(Modifier.height(16.dp))
+                BackupSection(shell)
+                Spacer(Modifier.height(16.dp))
                 SectionTitle(s.about)
                 Text(s.aboutBody, style = HeritageType.label, color = p.inkSoft, modifier = Modifier.padding(top = 6.dp))
                 Text(

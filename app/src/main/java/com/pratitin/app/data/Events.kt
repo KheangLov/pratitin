@@ -92,20 +92,16 @@ class EventStore(context: Context, private val scope: CoroutineScope, private va
         _events.value = _events.value.filter { it.id != id }
     }
 
+    /** Restore from a backup: replaces everything (and saves). */
+    fun replaceAll(list: List<UserEvent>) { _events.value = list.distinctBy { it.id } }
+
     fun on(date: Int): List<UserEvent> =
         _events.value.filter { it.occursOn(date) }.sortedWith(compareBy({ !it.allDay }, { it.startMin }))
 
     private fun load(): List<UserEvent> = parse(file)
 
     private suspend fun save(list: List<UserEvent>) = withContext(Dispatchers.IO) {
-        val arr = JSONArray()
-        list.forEach { e ->
-            arr.put(JSONObject().apply {
-                put("id", e.id); put("kind", e.kind.name); put("title", e.title); put("note", e.note)
-                put("start", e.start); put("allDay", e.allDay); put("startMin", e.startMin); put("dur", e.durationMin)
-                put("repeat", e.repeat.name); put("color", e.color); put("remind", e.remind.name)
-            })
-        }
+        val arr = toJson(list)
         val out = file.startWrite()
         try { out.write(arr.toString().toByteArray(Charsets.UTF_8)); file.finishWrite(out) } catch (t: Exception) { file.failWrite(out) }
     }
@@ -114,8 +110,21 @@ class EventStore(context: Context, private val scope: CoroutineScope, private va
         /** Synchronous read, used by the reminder receiver when the UI isn't running. */
         fun readBlocking(context: Context): List<UserEvent> = parse(AtomicFile(File(context.filesDir, "events.json")))
 
-        private fun parse(f: AtomicFile): List<UserEvent> = runCatching {
-            val arr = JSONArray(String(f.readFully(), Charsets.UTF_8))
+        private fun parse(f: AtomicFile): List<UserEvent> = runCatching { fromJson(JSONArray(String(f.readFully(), Charsets.UTF_8))) }.getOrDefault(emptyList())
+
+        fun toJson(list: List<UserEvent>): JSONArray {
+            val arr = JSONArray()
+            list.filter { it.kind != EventKind.ANNIVERSARY }.forEach { e ->
+                arr.put(JSONObject().apply {
+                    put("id", e.id); put("kind", e.kind.name); put("title", e.title); put("note", e.note)
+                    put("start", e.start); put("allDay", e.allDay); put("startMin", e.startMin); put("dur", e.durationMin)
+                    put("repeat", e.repeat.name); put("color", e.color); put("remind", e.remind.name)
+                })
+            }
+            return arr
+        }
+
+        fun fromJson(arr: JSONArray): List<UserEvent> = run {
             List(arr.length()) { i ->
                 val o = arr.getJSONObject(i)
                 UserEvent(
@@ -128,6 +137,6 @@ class EventStore(context: Context, private val scope: CoroutineScope, private va
                     remind = runCatching { Remind.valueOf(o.optString("remind")) }.getOrDefault(Remind.NONE),
                 )
             }
-        }.getOrDefault(emptyList())
+        }
     }
 }

@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        vm.backupNow()
         com.pratitin.app.widget.WidgetRefresher.refreshAll(this)
     }
 }

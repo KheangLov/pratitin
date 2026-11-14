@@ -73,6 +73,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _today.value = Day.today()
             }
         }
+        // Auto-backup into the chosen folder a few seconds after anything changes.
+        combine(moods, eventStore.events, love, settings) { a, b, c, d -> listOf(a, b, c, d) }
+            .drop(1).debounce(4000)
+            .onEach { backupNow() }
+            .launchIn(viewModelScope)
         // Widgets follow moods, events, anniversaries and settings (after the stores' own debounced writes).
         combine(moods, events, love, settings) { a, b, c, d -> listOf(a, b, c, d) }
             .drop(1).debounce(1500)
@@ -94,6 +99,39 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteEvent(id: Long) = eventStore.delete(id)
     fun eventsOn(date: Int): List<UserEvent> = events.value.filter { it.occursOn(date) }
         .sortedWith(compareBy({ !it.allDay }, { it.startMin }))
+
+    // ------------------------------------------------------------------ backup & restore
+
+    /** Bumped after every successful folder backup, so the UI can show "last backup …". */
+    val backupTick = MutableStateFlow(0)
+
+    /** Everything as one backup JSON (null until settings have loaded). */
+    fun backupJson(): String? {
+        val st = settings.value ?: return null
+        return com.pratitin.app.data.Backup.encode(st, moods.value, eventStore.events.value, love.value)
+    }
+
+    /** Write to the auto-backup folder now (no-op if none chosen). */
+    fun backupNow() {
+        val app = getApplication<Application>()
+        if (com.pratitin.app.data.Backup.folder(app) == null) return
+        val json = backupJson() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            com.pratitin.app.data.Backup.writeToFolder(app, json)
+            backupTick.value++
+        }
+    }
+
+    /** Replace all data with a backup's contents. */
+    fun restore(p: com.pratitin.app.data.Backup.Payload) {
+        eventStore.replaceAll(p.events)
+        moodStore.replaceAll(p.moods)
+        loveStore.replaceAll(p.love)
+        viewModelScope.launch(Dispatchers.IO) {
+            settingsStore.update { p.settings }
+            Reminders.rescheduleAsync(getApplication())
+        }
+    }
 
     fun saveAnniversary(a: Anniversary) = loveStore.upsert(a)
     fun deleteAnniversary(id: Long) = loveStore.delete(id)

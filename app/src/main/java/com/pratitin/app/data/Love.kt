@@ -123,7 +123,21 @@ class LoveStore(context: Context, private val scope: CoroutineScope, private val
     fun delete(id: Long) { _data.value = _data.value.let { d -> d.copy(items = d.items.filter { it.id != id }) } }
     fun updateProfile(t: (LoveProfile) -> LoveProfile) { _data.value = _data.value.let { it.copy(profile = t(it.profile)) } }
 
+    /** Restore from a backup: replaces everything (and saves). */
+    fun replaceAll(d: LoveData) { _data.value = d }
+
     private suspend fun save(d: LoveData) = withContext(Dispatchers.IO) {
+        val o = toJson(d)
+        val out = file.startWrite()
+        try { out.write(o.toString().toByteArray(Charsets.UTF_8)); file.finishWrite(out) } catch (t: Exception) { file.failWrite(out) }
+    }
+
+    companion object {
+        fun readBlocking(context: Context): LoveData = parse(AtomicFile(File(context.filesDir, "love.json")))
+
+        private fun parse(f: AtomicFile): LoveData = runCatching { fromJson(JSONObject(String(f.readFully(), Charsets.UTF_8))) }.getOrDefault(LoveData())
+
+        fun toJson(d: LoveData): JSONObject {
         val o = JSONObject()
         o.put("you", d.profile.you); o.put("partner", d.profile.partner); o.put("featured", d.profile.featuredId)
         o.put("sound", d.profile.sound); o.put("music", d.profile.music); o.put("song", d.profile.song)
@@ -135,15 +149,10 @@ class LoveStore(context: Context, private val scope: CoroutineScope, private val
             })
         }
         o.put("items", arr)
-        val out = file.startWrite()
-        try { out.write(o.toString().toByteArray(Charsets.UTF_8)); file.finishWrite(out) } catch (t: Exception) { file.failWrite(out) }
-    }
+        return o
+        }
 
-    companion object {
-        fun readBlocking(context: Context): LoveData = parse(AtomicFile(File(context.filesDir, "love.json")))
-
-        private fun parse(f: AtomicFile): LoveData = runCatching {
-            val o = JSONObject(String(f.readFully(), Charsets.UTF_8))
+        fun fromJson(o: JSONObject): LoveData = run {
             val arr = o.optJSONArray("items") ?: JSONArray()
             LoveData(
                 profile = LoveProfile(
@@ -162,7 +171,7 @@ class LoveStore(context: Context, private val scope: CoroutineScope, private val
                     )
                 },
             )
-        }.getOrDefault(LoveData())
+        }
     }
 }
 

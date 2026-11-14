@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Auto Backup (Android 6–11): your data goes to your Google account and comes back on reinstall. -->
+<full-backup-content>
+    <include domain="file" path="events.json" />
+    <include domain="file" path="love.json" />
+    <include domain="file" path="moods.tsv" />
+    <include domain="file" path="datastore/settings.preferences_pb" />
+</full-backup-content>
